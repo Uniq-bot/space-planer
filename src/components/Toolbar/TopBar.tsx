@@ -109,9 +109,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         userSelect: 'none',
         zIndex: 50
       }}
+      className="topbar"
     >
       {/* Left: Brand & Title & View Toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div className="topbar-group topbar-primary" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 16 }}>
           <div
             style={{
@@ -129,7 +130,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             📐
           </div>
-          <span style={{ letterSpacing: -0.3 }}>SpacePlanner</span>
+          <span style={{ letterSpacing: -0.3 }}>EkPlanner</span>
           <span style={{ fontSize: 11, padding: '2px 6px', background: theme.accentFaint, color: theme.accent, borderRadius: 4, fontWeight: 600 }}>
             STUDIO
           </span>
@@ -186,7 +187,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         {/* Undo / Redo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="topbar-history" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             onClick={onUndo}
             disabled={!canUndo}
@@ -223,7 +224,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Center: Zoom & View controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="topbar-group topbar-view-controls" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
           onClick={() => onUpdateViewState((vs) => ({ ...vs, zoom: Math.max(0.2, vs.zoom * 0.85) }))}
           title="Zoom Out"
@@ -279,7 +280,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Right: Templates, Theme, Export */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="topbar-group topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {/* Templates Button */}
         <button
           onClick={() => setShowTemplateModal(true)}

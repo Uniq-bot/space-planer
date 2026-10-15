@@ -260,7 +260,7 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Main Middle Workspace */}
-      <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+      <div className="workspace-shell" style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         {/* Left Toolbar & Furniture Catalog */}
         <LeftSidebar
           tool={tool}
@@ -270,7 +270,7 @@ export const App: React.FC = () => {
         />
 
         {/* Viewport: 2D Canvas or 3D Walkthrough */}
-        <main style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+        <main className="workspace-viewport" style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           {viewMode === '2D' ? (
             <FloorCanvas
               plan={plan}

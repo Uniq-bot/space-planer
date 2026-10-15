@@ -38,6 +38,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
   return (
     <footer
+      className="status-bar"
       style={{
         height: 28,
         background: theme.uiBg,

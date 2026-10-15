@@ -70,6 +70,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   return (
     <aside
+      className="left-sidebar"
       style={{
         display: 'flex',
         height: '100%',

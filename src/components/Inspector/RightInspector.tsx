@@ -147,6 +147,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
   return (
     <aside
+      className="right-inspector"
       style={{
         width: 280,
         background: theme.uiBg,
