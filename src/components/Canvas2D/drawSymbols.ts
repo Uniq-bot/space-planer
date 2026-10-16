@@ -1059,7 +1059,8 @@ export function drawCadSymbol(
     // ------------------------------------------------------------------------
     // 22. POTTED PLANT
     // ------------------------------------------------------------------------
-    case 'plant_indoor': {
+    case 'plant_indoor':
+    case 'plant_ficus': {
       const pr = Math.min(hw, hd);
 
       // Outer planter pot rim

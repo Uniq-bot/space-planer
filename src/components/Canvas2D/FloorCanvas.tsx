@@ -8,6 +8,7 @@ import {
   ViewState
 } from '../../types/floorplan';
 import { ThemeColors } from '../../constants/themes';
+import { FURNITURE_CATALOG } from '../../constants/catalog';
 import {
   worldToScreen,
   screenToWorld,
@@ -106,8 +107,10 @@ export const FloorCanvas: React.FC<FloorCanvasProps> = ({
   // Main Render Function
   const render = useCallback(() => {
     const canvas = canvasRef.current;
+   
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    console.log(ctx)
     if (!ctx) return;
 
     const vs = currentViewRef.current;
@@ -1530,14 +1533,16 @@ export const FloorCanvas: React.FC<FloorCanvasProps> = ({
     const mouseY = e.clientY - rect.top;
     const world = screenToWorld(mouseX, mouseY, currentViewRef.current);
 
+    const catalogItem = FURNITURE_CATALOG.find((item) => item.type === type);
     const newSym = {
       id: `sym_${Date.now()}`,
       type,
-      category: 'living',
+      category: catalogItem?.category || 'living',
       x: snapToGrid(world.x, 25),
       y: snapToGrid(world.y, 25),
-      width: 100,
-      depth: 60,
+      width: catalogItem?.width || 100,
+      depth: catalogItem?.depth || 60,
+      height: catalogItem?.height || 80,
       rotation: 0
     };
 

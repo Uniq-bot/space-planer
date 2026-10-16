@@ -5,6 +5,11 @@ import { FloorPlan, Wall, Opening, SymbolItem } from '../../types/floorplan';
 import { ThemeColors } from '../../constants/themes';
 import { getThreeTexture } from '../../utils/textures';
 import { buildFurniture3D } from './furniture3D';
+import {
+  preloadModelTypes,
+  addModelLoadListener,
+  disposeHierarchy
+} from './modelLoader';
 
 interface Walkthrough3DProps {
   plan: FloorPlan;
@@ -22,6 +27,20 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [cameraMode, setCameraMode] = useState<'orbit' | 'firstPerson'>('orbit');
   const [seeThroughWalls, setSeeThroughWalls] = useState<boolean>(false);
+  const [modelVersion, setModelVersion] = useState(0);
+
+  // Preload 3D models for furniture present in the floor plan
+  useEffect(() => {
+    const types = Array.from(new Set(plan.symbols.map((s) => s.type)));
+    preloadModelTypes(types);
+  }, [plan.symbols]);
+
+  // Subscribe to background model loads to update the scene smoothly
+  useEffect(() => {
+    return addModelLoadListener(() => {
+      setModelVersion((v) => v + 1);
+    });
+  }, []);
 
   // References
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -68,6 +87,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -86,27 +106,34 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     controls.target.set(300, 60, 300);
     controls.update();
 
-    // 5. Lighting
-    const ambientLight = new THREE.AmbientLight(0xfff8ee, 0.75);
+    // 5. Rich Multi-Source Lighting
+    const ambientLight = new THREE.AmbientLight(0xfff7ee, 0.62);
     scene.add(ambientLight);
 
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.45);
     hemiLight.position.set(0, 1500, 0);
     scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 0.95);
-    sunLight.position.set(900, 1400, 700);
+    // Primary warm sunlight with soft architectural shadows
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.15);
+    sunLight.position.set(900, 1500, 700);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 100;
     sunLight.shadow.camera.far = 4500;
-    sunLight.shadow.camera.left = -1400;
-    sunLight.shadow.camera.right = 1400;
-    sunLight.shadow.camera.top = 1400;
-    sunLight.shadow.camera.bottom = -1400;
-    sunLight.shadow.bias = -0.0004;
+    sunLight.shadow.camera.left = -1600;
+    sunLight.shadow.camera.right = 1600;
+    sunLight.shadow.camera.top = 1600;
+    sunLight.shadow.camera.bottom = -1600;
+    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
+
+    // Secondary sky fill light from opposite angle to reveal material details
+    const fillLight = new THREE.DirectionalLight(0xbfdbfe, 0.42);
+    fillLight.position.set(-800, 1100, -600);
+    scene.add(fillLight);
 
     // 6. Ground grid plane
     const gridHelper = new THREE.GridHelper(3600, 72, 0x94a3b8, 0xd8d6cf);
@@ -126,24 +153,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       color: 0x8b5a2b,
       roughness: 0.55,
       metalness: 0.08
-    });
-
-    const fabricMat = new THREE.MeshStandardMaterial({
-      color: 0x475569,
-      roughness: 0.92,
-      metalness: 0.02
-    });
-
-    const metalMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.25,
-      metalness: 0.85
-    });
-
-    const whitePorcelainMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.15,
-      metalness: 0.1
     });
 
     // 8. Build Walls & Openings in 3D (Selectable!)
@@ -366,6 +375,17 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       symGroup.rotation.y = -((sym.rotation || 0) * Math.PI) / 180;
       scene.add(symGroup);
       selectables.forEach((m) => selectableMeshesRef.current.push(m));
+
+      // Dynamic warm accent point lights for luminaire symbols
+      if (sym.type === 'ceiling_light') {
+        const pLight = new THREE.PointLight(0xfffaed, 0.9, 450, 1.3);
+        pLight.position.set(sym.x, 215, sym.y);
+        scene.add(pLight);
+      } else if (sym.type === 'nightstand') {
+        const pLight = new THREE.PointLight(0xffedd5, 0.55, 220, 1.5);
+        pLight.position.set(sym.x, 65, sym.y);
+        scene.add(pLight);
+      }
     });
 
     // 11. Animation Loop
@@ -513,9 +533,10 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       controls.dispose();
+      disposeHierarchy(scene);
       renderer.dispose();
     };
-  }, [plan, theme, selectedIds, cameraMode, seeThroughWalls, onSelectIds]);
+  }, [plan, theme, selectedIds, cameraMode, seeThroughWalls, onSelectIds, modelVersion]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>

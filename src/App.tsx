@@ -8,6 +8,7 @@ import {
 } from './types/floorplan';
 import { THEMES } from './constants/themes';
 import { TEMPLATES } from './constants/templates';
+import { FURNITURE_CATALOG } from './constants/catalog';
 import { TopBar } from './components/Toolbar/TopBar';
 import { LeftSidebar } from './components/Sidebar/LeftSidebar';
 import { FloorCanvas } from './components/Canvas2D/FloorCanvas';
@@ -120,14 +121,16 @@ export const App: React.FC = () => {
 
   // Add piece directly from catalog
   const handleAddItemDirectly = (type: string) => {
+    const catalogItem = FURNITURE_CATALOG.find((item) => item.type === type);
     const newSym: SymbolItem = {
       id: `sym_${Date.now()}`,
       type,
-      category: 'living',
+      category: catalogItem?.category || 'living',
       x: 300,
       y: 250,
-      width: 120,
-      depth: 60,
+      width: catalogItem?.width || 120,
+      depth: catalogItem?.depth || 60,
+      height: catalogItem?.height || 80,
       rotation: 0
     };
     handleUpdatePlan({

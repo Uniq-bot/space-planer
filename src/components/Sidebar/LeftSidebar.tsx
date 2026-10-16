@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ToolMode, FurnitureCatalogItem } from '../../types/floorplan';
 import { ThemeColors } from '../../constants/themes';
 import { FURNITURE_CATALOG } from '../../constants/catalog';
-import { drawCadSymbol } from '../Canvas2D/drawSymbols';
 import {
   MousePointer,
   Hand,

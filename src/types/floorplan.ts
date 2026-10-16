@@ -41,6 +41,7 @@ export interface SymbolItem {
   label?: string;
   color?: string;
   material?: string;
+  height?: number; // in cm
 }
 
 export interface Room {

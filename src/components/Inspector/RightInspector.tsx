@@ -379,8 +379,8 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 <label style={{ display: 'block', color: theme.uiMuted, marginBottom: 4 }}>Width (cm)</label>
                 <input
                   type="number"
-                  min="20"
-                  max="500"
+                  min="10"
+                  max="600"
                   value={selectedSymbol.width}
                   onChange={(e) => updateSymbol({ width: Number(e.target.value) })}
                   style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${theme.uiBorder}`, background: 'transparent', color: theme.uiText, fontSize: 12 }}
@@ -390,10 +390,21 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 <label style={{ display: 'block', color: theme.uiMuted, marginBottom: 4 }}>Depth (cm)</label>
                 <input
                   type="number"
-                  min="20"
-                  max="500"
+                  min="10"
+                  max="600"
                   value={selectedSymbol.depth}
                   onChange={(e) => updateSymbol({ depth: Number(e.target.value) })}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${theme.uiBorder}`, background: 'transparent', color: theme.uiText, fontSize: 12 }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', color: theme.uiMuted, marginBottom: 4 }}>Height (cm)</label>
+                <input
+                  type="number"
+                  min="10"
+                  max="600"
+                  value={selectedSymbol.height || 80}
+                  onChange={(e) => updateSymbol({ height: Number(e.target.value) })}
                   style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${theme.uiBorder}`, background: 'transparent', color: theme.uiText, fontSize: 12 }}
                 />
               </div>

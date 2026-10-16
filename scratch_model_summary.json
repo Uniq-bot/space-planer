@@ -1,0 +1,1002 @@
+[
+  {
+    "folder": "arm_chair__furniture",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 7,
+    "meshesCount": 1,
+    "materials": [
+      "Base"
+    ],
+    "textures": [
+      "textures/Base_baseColor.jpeg",
+      "textures/Base_metallicRoughness.png",
+      "textures/Base_normal.jpeg"
+    ],
+    "minBounds": [
+      -0.9989264011383057,
+      -0.9462430477142334,
+      -1
+    ],
+    "maxBounds": [
+      0.9989264011383057,
+      0.9462430477142334,
+      1
+    ]
+  },
+  {
+    "folder": "bathtub",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 5,
+    "meshesCount": 1,
+    "materials": [
+      "Material_3"
+    ],
+    "textures": [
+      "textures/Material_3_baseColor.jpeg",
+      "textures/Material_3_metallicRoughness.png",
+      "textures/Material_3_normal.png"
+    ],
+    "minBounds": [
+      -93.07581329345703,
+      -42.837554931640625,
+      -0.03398323059082031
+    ],
+    "maxBounds": [
+      93.07581329345703,
+      46.46379089355469,
+      71.31956481933594
+    ]
+  },
+  {
+    "folder": "bed",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 6,
+    "meshesCount": 2,
+    "materials": [
+      "Material"
+    ],
+    "textures": [
+      "textures/Material_baseColor.jpeg",
+      "textures/Material_metallicRoughness.png",
+      "textures/Material_normal.png"
+    ],
+    "minBounds": [
+      -2.957047700881958,
+      -3.068953275680542,
+      -3.730372905731201
+    ],
+    "maxBounds": [
+      2.462606191635132,
+      7.8286542892456055,
+      2.968564510345459
+    ]
+  },
+  {
+    "folder": "bookcase",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 64,
+    "meshesCount": 39,
+    "materials": [
+      "Shelf_frame",
+      "Shelf",
+      "Book_1",
+      "Book_1_paper",
+      "Book_2",
+      "Book_2_paper",
+      "Book_3",
+      "Book_3_paper",
+      "Book_4",
+      "Book_4_paper",
+      "Book_5",
+      "Book_5_paper",
+      "Book_6",
+      "Book_6_paper",
+      "Book_7",
+      "Book_7_paper",
+      "Book_8",
+      "Book_8_paper",
+      "Book_9",
+      "Book_9_paper",
+      "Book_10",
+      "Book_10_paper",
+      "Book_11",
+      "Book_11_paper",
+      "Book_12",
+      "Book_12_paper",
+      "Book_13",
+      "Book_13_paper",
+      "Book_14",
+      "Book_14_paper",
+      "Book_15",
+      "Book_15_paper",
+      "Book_16",
+      "Book_16_paper",
+      "Book_17",
+      "Book_17_paper"
+    ],
+    "textures": [
+      "textures/Shelf_frame_baseColor.jpeg",
+      "textures/Shelf_frame_metallicRoughness.png",
+      "textures/Shelf_frame_normal.png",
+      "textures/Shelf_baseColor.jpeg",
+      "textures/Shelf_metallicRoughness.png",
+      "textures/Shelf_normal.png",
+      "textures/Book_1_baseColor.jpeg",
+      "textures/Book_1_paper_baseColor.jpeg",
+      "textures/Book_2_baseColor.jpeg",
+      "textures/Book_3_baseColor.jpeg",
+      "textures/Book_4_baseColor.jpeg",
+      "textures/Book_5_baseColor.jpeg",
+      "textures/Book_6_baseColor.jpeg",
+      "textures/Book_6_paper_baseColor.png",
+      "textures/Book_7_baseColor.jpeg",
+      "textures/Book_8_baseColor.jpeg",
+      "textures/Book_9_baseColor.png",
+      "textures/Book_10_baseColor.jpeg",
+      "textures/Book_11_baseColor.jpeg",
+      "textures/Book_12_baseColor.jpeg",
+      "textures/Book_13_baseColor.jpeg",
+      "textures/Book_14_baseColor.jpeg",
+      "textures/Book_15_baseColor.jpeg",
+      "textures/Book_16_baseColor.jpeg",
+      "textures/Book_16_paper_baseColor.png",
+      "textures/Book_17_baseColor.jpeg"
+    ],
+    "minBounds": [
+      -1,
+      -1,
+      -1
+    ],
+    "maxBounds": [
+      1,
+      1,
+      1.8599621057510376
+    ]
+  },
+  {
+    "folder": "bt-_isola-_triple-_sofa",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 17,
+    "meshesCount": 7,
+    "materials": [
+      "fabric_blue_2",
+      "Material",
+      "Material.001"
+    ],
+    "textures": [
+      "textures/fabric_blue_2_baseColor.jpeg"
+    ],
+    "minBounds": [
+      -0.6611061692237854,
+      -0.8269994854927063,
+      -1.0025888681411743
+    ],
+    "maxBounds": [
+      1.8920884132385254,
+      0.7212292551994324,
+      0.2574388384819031
+    ]
+  },
+  {
+    "folder": "ceiling_light",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 11,
+    "meshesCount": 4,
+    "materials": [
+      "T_Overhead_light"
+    ],
+    "textures": [
+      "textures/T_Overhead_light_baseColor.png",
+      "textures/T_Overhead_light_metallicRoughness.png",
+      "textures/T_Overhead_light_emissive.png",
+      "textures/T_Overhead_light_normal.png"
+    ],
+    "minBounds": [
+      -0.16190800070762634,
+      -1.0035744905471802,
+      -0.9872447848320007
+    ],
+    "maxBounds": [
+      0.16190800070762634,
+      1.9612118005752563,
+      0.9872447848320007
+    ]
+  },
+  {
+    "folder": "chair",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 21,
+    "meshesCount": 9,
+    "materials": [
+      "Scene_-_Root"
+    ],
+    "textures": [
+      "textures/Scene_-_Root_baseColor.png",
+      "textures/Scene_-_Root_metallicRoughness.png",
+      "textures/Scene_-_Root_normal.png"
+    ],
+    "minBounds": [
+      -0.21182070672512054,
+      -0.25475072860717773,
+      -3.0901472314326384e-7
+    ],
+    "maxBounds": [
+      0.21182072162628174,
+      0.23423679172992706,
+      0.995995283126831
+    ]
+  },
+  {
+    "folder": "coffee_table",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 7,
+    "meshesCount": 2,
+    "materials": [
+      "CoffeeTable_mat",
+      "proxy"
+    ],
+    "textures": [
+      "textures/CoffeeTable_mat_baseColor.png",
+      "textures/CoffeeTable_mat_metallicRoughness.png",
+      "textures/CoffeeTable_mat_normal.png"
+    ],
+    "minBounds": [
+      -0.6825461387634277,
+      0,
+      -0.9733749032020569
+    ],
+    "maxBounds": [
+      2.1944127082824707,
+      0.49689093232154846,
+      0.46588045358657837
+    ]
+  },
+  {
+    "folder": "dining_table_6_seater_with_ugly_table_cloth",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 12,
+    "meshesCount": 8,
+    "materials": [
+      "FrontColor",
+      "Wood_Cherry_Original",
+      "Color_M00",
+      "Wood_Bamboo_1",
+      "Wood_Bamboo",
+      "Translucent_Glass_Gray",
+      "Wood_Bamboo_2",
+      "aiStandardSurface2"
+    ],
+    "textures": [
+      "textures/Wood_Cherry_Original_baseColor.png",
+      "textures/Wood_Cherry_Original_metallicRoughness.png",
+      "textures/Wood_Cherry_Original_normal.png",
+      "textures/Wood_Bamboo_2_baseColor.png",
+      "textures/Wood_Bamboo_2_metallicRoughness.png",
+      "textures/Wood_Bamboo_2_normal.png",
+      "textures/aiStandardSurface2_baseColor.jpeg"
+    ],
+    "minBounds": [
+      -145.8699951171875,
+      -3.6142072543316264e-14,
+      -96.46739959716797
+    ],
+    "maxBounds": [
+      147.9744110107422,
+      117.76622009277344,
+      97.78396606445312
+    ]
+  },
+  {
+    "folder": "finished_desk_project",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 155,
+    "meshesCount": 74,
+    "materials": [
+      "Book_Holder_1",
+      "Ink_pot_2",
+      "Fancy_Book",
+      "lambert11",
+      "lambert10",
+      "lambert12",
+      "blinn4",
+      "blinn9",
+      "Pen_Holder",
+      "blinn10",
+      "Desk",
+      "Thin_Book",
+      "Blue_Thin_Book",
+      "Pink_Thin_Book",
+      "blinn2",
+      "Pen1",
+      "blinn8",
+      "Pen2"
+    ],
+    "textures": [
+      "textures/Book_Holder_1_baseColor.jpeg",
+      "textures/Ink_pot_2_baseColor.jpeg",
+      "textures/Fancy_Book_baseColor.jpeg",
+      "textures/lambert11_baseColor.png",
+      "textures/lambert11_emissive.jpeg",
+      "textures/lambert10_baseColor.jpeg",
+      "textures/lambert12_baseColor.png",
+      "textures/blinn4_baseColor.jpeg",
+      "textures/blinn9_baseColor.jpeg",
+      "textures/blinn9_metallicRoughness.png",
+      "textures/Pen_Holder_baseColor.jpeg",
+      "textures/blinn10_baseColor.jpeg",
+      "textures/Desk_baseColor.jpeg",
+      "textures/Desk_metallicRoughness.png",
+      "textures/Thin_Book_baseColor.jpeg",
+      "textures/Blue_Thin_Book_baseColor.jpeg",
+      "textures/Pink_Thin_Book_baseColor.jpeg",
+      "textures/blinn2_baseColor.jpeg",
+      "textures/Pen1_baseColor.png",
+      "textures/blinn8_baseColor.png",
+      "textures/Pen2_baseColor.png"
+    ],
+    "minBounds": [
+      -109.94026184082031,
+      -23.139530181884766,
+      -16.078536987304688
+    ],
+    "maxBounds": [
+      40.035240173339844,
+      49.282470703125,
+      30.933197021484375
+    ]
+  },
+  {
+    "folder": "gas_stove",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 5,
+    "meshesCount": 1,
+    "materials": [
+      "Gas_Stove"
+    ],
+    "textures": [
+      "textures/Gas_Stove_baseColor.png",
+      "textures/Gas_Stove_metallicRoughness.png",
+      "textures/Gas_Stove_normal.png"
+    ],
+    "minBounds": [
+      -0.25,
+      -0.4274999797344208,
+      -0.36960938572883606
+    ],
+    "maxBounds": [
+      0.25,
+      1.0033029317855835,
+      0.3338717520236969
+    ]
+  },
+  {
+    "folder": "house_props__fridge",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 4,
+    "meshesCount": 1,
+    "materials": [
+      "Frigo"
+    ],
+    "textures": [
+      "textures/Frigo_baseColor.png"
+    ],
+    "minBounds": [
+      -1,
+      -0.9900000095367432,
+      0
+    ],
+    "maxBounds": [
+      1.251389980316162,
+      0.9900000095367432,
+      4.699709892272949
+    ]
+  },
+  {
+    "folder": "indoor_plant",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 9,
+    "meshesCount": 6,
+    "materials": [
+      "Indoor_Plant_pot",
+      "Indoor_Plant_pot_2",
+      "Material.005",
+      "Indoor_Plant",
+      "Indoor_Plant_ground",
+      "Material.002"
+    ],
+    "textures": [
+      "textures/Indoor_Plant_pot_baseColor.jpeg",
+      "textures/Indoor_Plant_pot_normal.png"
+    ],
+    "minBounds": [
+      -1.0149400234222412,
+      -1.328320026397705,
+      -0.009349999949336052
+    ],
+    "maxBounds": [
+      1.1328799724578857,
+      1.2138899564743042,
+      6.88539981842041
+    ]
+  },
+  {
+    "folder": "indoor_plant (1)",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf"
+    ],
+    "nodesCount": 14,
+    "meshesCount": 6,
+    "materials": [
+      "FrontColor",
+      "Color_E04_1",
+      "Color_F11",
+      "Translucent_Glass_Gray",
+      "Groundcover_Gravel_1inch"
+    ],
+    "textures": [],
+    "minBounds": [
+      -0.4699999988079071,
+      0.028920600190758705,
+      -0.48381346464157104
+    ],
+    "maxBounds": [
+      0.6105669736862183,
+      1.093809723854065,
+      0.5515314936637878
+    ]
+  },
+  {
+    "folder": "kilburn_tall_cabinet",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 14,
+    "meshesCount": 7,
+    "materials": [
+      "GREY",
+      "BLACK_INSIDE",
+      "EnvironmentAmbientLight",
+      "material",
+      "STEEL",
+      "RUBBER",
+      "FLOOR"
+    ],
+    "textures": [
+      "textures/GREY_baseColor.jpeg",
+      "textures/GREY_metallicRoughness.png",
+      "textures/FLOOR_baseColor.png"
+    ],
+    "minBounds": [
+      -167.02890014648438,
+      -167.02890014648438,
+      -2.2486650943756104
+    ],
+    "maxBounds": [
+      167.02890014648438,
+      167.02890014648438,
+      190
+    ]
+  },
+  {
+    "folder": "king_floor_bed",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 5,
+    "meshesCount": 2,
+    "materials": [
+      "material"
+    ],
+    "textures": [
+      "textures/material_baseColor.jpeg",
+      "textures/material_metallicRoughness.png",
+      "textures/material_normal.png"
+    ],
+    "minBounds": [
+      -1,
+      -0.3788290023803711,
+      -0.7975339889526367
+    ],
+    "maxBounds": [
+      1,
+      0.3788290023803711,
+      0.7975339889526367
+    ]
+  },
+  {
+    "folder": "kitchen_counter",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 10,
+    "meshesCount": 6,
+    "materials": [
+      "Basin",
+      "Main",
+      "material",
+      "Doors",
+      "Handles",
+      "Faucet"
+    ],
+    "textures": [
+      "textures/Basin_baseColor.png",
+      "textures/Basin_metallicRoughness.png",
+      "textures/Main_baseColor.png",
+      "textures/Main_metallicRoughness.png",
+      "textures/Main_normal.png",
+      "textures/material_baseColor.png",
+      "textures/material_metallicRoughness.png",
+      "textures/Doors_baseColor.png",
+      "textures/Doors_metallicRoughness.png",
+      "textures/Doors_normal.png",
+      "textures/Handles_baseColor.png",
+      "textures/Handles_metallicRoughness.png",
+      "textures/Handles_normal.png",
+      "textures/Faucet_baseColor.png",
+      "textures/Faucet_metallicRoughness.png",
+      "textures/Faucet_normal.png"
+    ],
+    "minBounds": [
+      -2.1156389713287354,
+      -5.6177802085876465,
+      -5.404253959655762
+    ],
+    "maxBounds": [
+      1.0387442111968994,
+      1.9582266807556152,
+      3.1111483573913574
+    ]
+  },
+  {
+    "folder": "low_poly_smart_tv_series_6",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf"
+    ],
+    "nodesCount": 25,
+    "meshesCount": 4,
+    "materials": [
+      "Plastic",
+      "Screen",
+      "Metal"
+    ],
+    "textures": [],
+    "minBounds": [
+      -350,
+      -199.99998474121094,
+      -125
+    ],
+    "maxBounds": [
+      350,
+      218.8318634033203,
+      125
+    ]
+  },
+  {
+    "folder": "modern_cream_style_double_sofa",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 13,
+    "meshesCount": 3,
+    "materials": [
+      "M_0_1____9_2_____210616_7006",
+      "M_0_1____9_________0_0_0_11ERE",
+      "M_0_____0______1"
+    ],
+    "textures": [
+      "textures/M_0_1____9_2_____210616_7006_baseColor.png",
+      "textures/M_0_1____9_________0_0_0_11ERE_baseColor.jpeg",
+      "textures/M_0_____0______1_baseColor.jpeg"
+    ],
+    "minBounds": [
+      1125.10595703125,
+      -0.000022888247258379124,
+      -4805.97412109375
+    ],
+    "maxBounds": [
+      2934.46875,
+      789.7534790039062,
+      -3624.025146484375
+    ]
+  },
+  {
+    "folder": "night_stand_lamp",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf"
+    ],
+    "nodesCount": 9,
+    "meshesCount": 7,
+    "materials": [
+      "BlackMetal",
+      "BlackPlastic",
+      "Bulb",
+      "Metal",
+      "None",
+      "White"
+    ],
+    "textures": [],
+    "minBounds": [
+      -0.3064030110836029,
+      -0.1158280000090599,
+      0.015647999942302704
+    ],
+    "maxBounds": [
+      0.16422100365161896,
+      0.1158280000090599,
+      0.7304220199584961
+    ]
+  },
+  {
+    "folder": "office_chair",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 44,
+    "meshesCount": 20,
+    "materials": [
+      "lambert1"
+    ],
+    "textures": [
+      "textures/lambert1_baseColor.png",
+      "textures/lambert1_metallicRoughness.png",
+      "textures/lambert1_normal.png"
+    ],
+    "minBounds": [
+      -49.999088287353516,
+      -817.6972045898438,
+      -111.44026947021484
+    ],
+    "maxBounds": [
+      50.00164794921875,
+      115.31471252441406,
+      628.3509521484375
+    ]
+  },
+  {
+    "folder": "outlet",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 5,
+    "meshesCount": 1,
+    "materials": [
+      "Material.001"
+    ],
+    "textures": [
+      "textures/Material.001_baseColor.png"
+    ],
+    "minBounds": [
+      -0.04000037908554077,
+      -0.002500581555068493,
+      -0.06000000238418579
+    ],
+    "maxBounds": [
+      0.040000058710575104,
+      0.0025004579219967127,
+      0.059999942779541016
+    ]
+  },
+  {
+    "folder": "round_table_furniture_model",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 4,
+    "meshesCount": 2,
+    "materials": [
+      "tablelegs",
+      "tabletop"
+    ],
+    "textures": [
+      "textures/tablelegs_baseColor.png",
+      "textures/tablelegs_metallicRoughness.png",
+      "textures/tablelegs_normal.png",
+      "textures/tabletop_baseColor.png",
+      "textures/tabletop_metallicRoughness.png",
+      "textures/tabletop_normal.png"
+    ],
+    "minBounds": [
+      -1.79367995262146,
+      0.7501040101051331,
+      -1.7000410556793213
+    ],
+    "maxBounds": [
+      1.79367995262146,
+      4.337464809417725,
+      -0.06001200154423714
+    ]
+  },
+  {
+    "folder": "shower_cabin",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 7,
+    "meshesCount": 5,
+    "materials": [
+      "bottom",
+      "m_glass_door",
+      "m_shower",
+      "m_walls_frame_handle_drain"
+    ],
+    "textures": [
+      "textures/bottom_baseColor.jpeg",
+      "textures/bottom_metallicRoughness.png",
+      "textures/m_glass_door_baseColor.png",
+      "textures/m_glass_door_metallicRoughness.png",
+      "textures/m_glass_door_normal.png",
+      "textures/m_shower_baseColor.jpeg",
+      "textures/m_shower_metallicRoughness.png",
+      "textures/m_shower_normal.png",
+      "textures/m_walls_frame_handle_drain_baseColor.jpeg",
+      "textures/m_walls_frame_handle_drain_metallicRoughness.png",
+      "textures/m_walls_frame_handle_drain_normal.png"
+    ],
+    "minBounds": [
+      -0.30498799681663513,
+      -0.5339639782905579,
+      -0.48416200280189514
+    ],
+    "maxBounds": [
+      0.9986720085144043,
+      0.514726996421814,
+      1.7787669897079468
+    ]
+  },
+  {
+    "folder": "single_bed_2",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 13,
+    "meshesCount": 5,
+    "materials": [
+      "Wood_Material",
+      "Duvet_Material",
+      "Sheet_Material"
+    ],
+    "textures": [
+      "textures/Wood_Material_diffuse.jpeg",
+      "textures/Wood_Material_normal.png",
+      "textures/Duvet_Material_diffuse.jpeg",
+      "textures/Duvet_Material_normal.png",
+      "textures/Sheet_Material_diffuse.jpeg"
+    ],
+    "minBounds": [
+      -0.8103024959564209,
+      -1.8367805480957031,
+      -1.1783665418624878
+    ],
+    "maxBounds": [
+      0.7930947542190552,
+      0.1865047812461853,
+      1.402403473854065
+    ]
+  },
+  {
+    "folder": "sink_and_vanity",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 22,
+    "meshesCount": 10,
+    "materials": [
+      "Glass_and_cabinet",
+      "Sink",
+      "Wood_and_Faucet",
+      "Drawer_and_handle",
+      "Mirror"
+    ],
+    "textures": [
+      "textures/Glass_and_cabinet_baseColor.png",
+      "textures/Glass_and_cabinet_metallicRoughness.png",
+      "textures/Glass_and_cabinet_normal.png",
+      "textures/Sink_baseColor.jpeg",
+      "textures/Sink_metallicRoughness.png",
+      "textures/Sink_normal.png",
+      "textures/Wood_and_Faucet_baseColor.jpeg",
+      "textures/Wood_and_Faucet_metallicRoughness.png",
+      "textures/Wood_and_Faucet_normal.png",
+      "textures/Drawer_and_handle_baseColor.jpeg",
+      "textures/Drawer_and_handle_metallicRoughness.png",
+      "textures/Drawer_and_handle_normal.png",
+      "textures/Mirror_baseColor.jpeg",
+      "textures/Mirror_metallicRoughness.png",
+      "textures/Mirror_normal.png"
+    ],
+    "minBounds": [
+      -0.6828770041465759,
+      -1,
+      -0.3905450105667114
+    ],
+    "maxBounds": [
+      0.6828770041465759,
+      1,
+      0.3905450105667114
+    ]
+  },
+  {
+    "folder": "toilet",
+    "format": "gltf",
+    "file": "scene.gltf",
+    "subfiles": [
+      "license.txt",
+      "scene.bin",
+      "scene.gltf",
+      "textures"
+    ],
+    "nodesCount": 14,
+    "meshesCount": 5,
+    "materials": [
+      "Toilet"
+    ],
+    "textures": [
+      "textures/Toilet_baseColor.png",
+      "textures/Toilet_metallicRoughness.png",
+      "textures/Toilet_normal.png"
+    ],
+    "minBounds": [
+      -26.705318450927734,
+      -1.7300844192504883,
+      -3.59177303314209
+    ],
+    "maxBounds": [
+      21.129558563232422,
+      67.01891326904297,
+      60.456478118896484
+    ]
+  }
+]

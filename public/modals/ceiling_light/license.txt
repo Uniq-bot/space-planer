@@ -1,0 +1,8 @@
+Model Information:
+* title:	Ceiling light
+* source:	https://sketchfab.com/3d-models/ceiling-light-880da42a3951442095cd2c4dd1c069a3
+* author:	Sousinho (https://sketchfab.com/sousinho)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

@@ -67,19 +67,21 @@ export const TEMPLATES: Record<string, () => FloorPlan> = {
     ];
 
     const symbols: SymbolItem[] = [
-      { id: 'sym_bed', type: 'bed_queen', category: 'bedroom', x: 130, y: 150, width: 160, depth: 200, rotation: 0 },
-      { id: 'sym_night1', type: 'nightstand', category: 'bedroom', x: 30, y: 80, width: 45, depth: 40, rotation: 0 },
-      { id: 'sym_sofa', type: 'sofa_2', category: 'living', x: 360, y: 180, width: 160, depth: 85, rotation: 0 },
-      { id: 'sym_coffee', type: 'table_coffee', category: 'living', x: 360, y: 260, width: 90, depth: 55, rotation: 0 },
-      { id: 'sym_tv', type: 'tv_unit', category: 'living', x: 470, y: 180, width: 140, depth: 40, rotation: 90 },
-      { id: 'sym_dining', type: 'table_dining_4', category: 'dining', x: 360, y: 380, width: 120, depth: 80, rotation: 0 },
-      { id: 'sym_counter', type: 'counter', category: 'kitchen', x: 360, y: 560, width: 160, depth: 60, rotation: 0 },
-      { id: 'sym_ksink', type: 'counter_sink', category: 'kitchen', x: 450, y: 560, width: 90, depth: 60, rotation: 0 },
-      { id: 'sym_fridge', type: 'fridge', category: 'kitchen', x: 260, y: 560, width: 65, depth: 65, rotation: 0 },
+      { id: 'sym_bed', type: 'bed_queen', category: 'bedroom', x: 130, y: 150, width: 160, depth: 200, height: 110, rotation: 0 },
+      { id: 'sym_night1', type: 'nightstand', category: 'bedroom', x: 30, y: 80, width: 45, depth: 40, height: 70, rotation: 0 },
+      { id: 'sym_sofa', type: 'sofa_2', category: 'living', x: 360, y: 180, width: 160, depth: 85, height: 80, rotation: 0 },
+      { id: 'sym_coffee', type: 'table_coffee', category: 'living', x: 360, y: 260, width: 90, depth: 55, height: 45, rotation: 0 },
+      { id: 'sym_tv', type: 'tv_unit', category: 'living', x: 470, y: 180, width: 140, depth: 40, height: 50, rotation: 90 },
+      { id: 'sym_dining', type: 'table_round_6', category: 'dining', x: 360, y: 380, width: 120, depth: 120, height: 75, rotation: 0 },
+      { id: 'sym_counter', type: 'counter', category: 'kitchen', x: 360, y: 560, width: 160, depth: 60, height: 90, rotation: 0 },
+      { id: 'sym_stove', type: 'stove', category: 'kitchen', x: 450, y: 560, width: 60, depth: 60, height: 90, rotation: 0 },
+      { id: 'sym_fridge', type: 'fridge', category: 'kitchen', x: 260, y: 560, width: 70, depth: 70, height: 185, rotation: 0 },
+      { id: 'sym_plant', type: 'plant_indoor', category: 'living', x: 470, y: 70, width: 50, depth: 50, height: 90, rotation: 0 },
+      { id: 'sym_light', type: 'ceiling_light', category: 'electrical', x: 250, y: 300, width: 40, depth: 40, height: 30, rotation: 0 },
       // Bathroom
-      { id: 'sym_toilet', type: 'toilet', category: 'bathroom', x: 60, y: 580, width: 45, depth: 70, rotation: 0 },
-      { id: 'sym_bsink', type: 'sink', category: 'bathroom', x: 180, y: 460, width: 60, depth: 45, rotation: 180 },
-      { id: 'sym_shower', type: 'shower', category: 'bathroom', x: 60, y: 460, width: 85, depth: 85, rotation: 0 }
+      { id: 'sym_toilet', type: 'toilet', category: 'bathroom', x: 60, y: 580, width: 45, depth: 70, height: 75, rotation: 0 },
+      { id: 'sym_bsink', type: 'sink', category: 'bathroom', x: 180, y: 460, width: 65, depth: 50, height: 85, rotation: 180 },
+      { id: 'sym_shower', type: 'shower', category: 'bathroom', x: 60, y: 460, width: 100, depth: 100, height: 210, rotation: 0 }
     ];
 
     const rooms: Room[] = [
@@ -126,24 +128,23 @@ export const TEMPLATES: Record<string, () => FloorPlan> = {
 
     const symbols: SymbolItem[] = [
       // Bedroom
-      { id: 'b_bed', type: 'bed_king', category: 'bedroom', x: 190, y: 150, width: 180, depth: 210, rotation: 0 },
-      { id: 'b_night1', type: 'nightstand', category: 'bedroom', x: 70, y: 70, width: 45, depth: 40, rotation: 0 },
-      { id: 'b_night2', type: 'nightstand', category: 'bedroom', x: 310, y: 70, width: 45, depth: 40, rotation: 0 },
-      { id: 'b_wardrobe', type: 'wardrobe', category: 'bedroom', x: 60, y: 260, width: 150, depth: 60, rotation: 90 },
+      { id: 'b_bed', type: 'bed_king', category: 'bedroom', x: 190, y: 150, width: 180, depth: 210, height: 110, rotation: 0 },
+      { id: 'b_night1', type: 'nightstand', category: 'bedroom', x: 70, y: 70, width: 45, depth: 40, height: 70, rotation: 0 },
+      { id: 'b_night2', type: 'nightstand', category: 'bedroom', x: 310, y: 70, width: 45, depth: 40, height: 70, rotation: 0 },
+      { id: 'b_cabinet', type: 'tall_cabinet', category: 'kitchen', x: 60, y: 260, width: 60, depth: 60, height: 210, rotation: 0 },
       // Living Room
-      { id: 'l_sofa', type: 'sofa_3', category: 'living', x: 570, y: 160, width: 220, depth: 90, rotation: 0 },
-      { id: 'l_coffee', type: 'table_coffee', category: 'living', x: 570, y: 240, width: 110, depth: 60, rotation: 0 },
-      { id: 'l_tv', type: 'tv_unit', category: 'living', x: 720, y: 160, width: 160, depth: 40, rotation: 90 },
-      { id: 'l_plant', type: 'plant_indoor', category: 'living', x: 420, y: 70, width: 50, depth: 50, rotation: 0 },
+      { id: 'l_sofa', type: 'sofa_3', category: 'living', x: 570, y: 160, width: 220, depth: 90, height: 80, rotation: 0 },
+      { id: 'l_coffee', type: 'table_coffee', category: 'living', x: 570, y: 240, width: 110, depth: 60, height: 45, rotation: 0 },
+      { id: 'l_tv', type: 'tv_unit', category: 'living', x: 720, y: 160, width: 160, depth: 40, height: 50, rotation: 90 },
+      { id: 'l_plant', type: 'plant_indoor', category: 'living', x: 420, y: 70, width: 50, depth: 50, height: 90, rotation: 0 },
       // Dining & Kitchen
-      { id: 'd_table', type: 'table_dining_4', category: 'dining', x: 580, y: 480, width: 120, depth: 80, rotation: 0 },
-      { id: 'k_counter', type: 'counter', category: 'kitchen', x: 280, y: 550, width: 120, depth: 60, rotation: 0 },
-      { id: 'k_sink', type: 'counter_sink', category: 'kitchen', x: 390, y: 550, width: 90, depth: 60, rotation: 0 },
-      { id: 'k_stove', type: 'stove', category: 'kitchen', x: 470, y: 550, width: 60, depth: 60, rotation: 0 },
+      { id: 'd_table', type: 'table_dining_6', category: 'dining', x: 580, y: 480, width: 160, depth: 90, height: 75, rotation: 0 },
+      { id: 'k_counter', type: 'counter', category: 'kitchen', x: 280, y: 550, width: 120, depth: 60, height: 90, rotation: 0 },
+      { id: 'k_stove', type: 'stove', category: 'kitchen', x: 470, y: 550, width: 60, depth: 60, height: 90, rotation: 0 },
       // Bathroom
-      { id: 'ba_tub', type: 'bathtub', category: 'bathroom', x: 100, y: 540, width: 150, depth: 75, rotation: 0 },
-      { id: 'ba_toilet', type: 'toilet', category: 'bathroom', x: 160, y: 420, width: 45, depth: 70, rotation: 180 },
-      { id: 'ba_sink', type: 'sink', category: 'bathroom', x: 50, y: 420, width: 60, depth: 45, rotation: 180 },
+      { id: 'ba_tub', type: 'bathtub', category: 'bathroom', x: 100, y: 540, width: 160, depth: 75, height: 55, rotation: 0 },
+      { id: 'ba_toilet', type: 'toilet', category: 'bathroom', x: 160, y: 420, width: 45, depth: 70, height: 75, rotation: 180 },
+      { id: 'ba_sink', type: 'sink', category: 'bathroom', x: 50, y: 420, width: 65, depth: 50, height: 85, rotation: 180 },
     ];
 
     const rooms: Room[] = [
@@ -194,23 +195,23 @@ export const TEMPLATES: Record<string, () => FloorPlan> = {
 
     const symbols: SymbolItem[] = [
       // Bed 1
-      { id: 'b1_bed', type: 'bed_queen', category: 'bedroom', x: 180, y: 150, width: 160, depth: 200, rotation: 0 },
-      { id: 'b1_ward', type: 'wardrobe', category: 'bedroom', x: 60, y: 250, width: 150, depth: 60, rotation: 90 },
+      { id: 'b1_bed', type: 'bed_queen', category: 'bedroom', x: 180, y: 150, width: 160, depth: 200, height: 110, rotation: 0 },
+      { id: 'b1_cabinet', type: 'tall_cabinet', category: 'kitchen', x: 60, y: 250, width: 60, depth: 60, height: 210, rotation: 0 },
       // Bed 2
-      { id: 'b2_bed', type: 'bed_single', category: 'bedroom', x: 750, y: 150, width: 90, depth: 200, rotation: 0 },
-      { id: 'b2_desk', type: 'desk', category: 'office', x: 840, y: 260, width: 120, depth: 60, rotation: 90 },
+      { id: 'b2_bed', type: 'bed_single', category: 'bedroom', x: 750, y: 150, width: 90, depth: 200, height: 90, rotation: 0 },
+      { id: 'b2_desk', type: 'desk', category: 'office', x: 840, y: 260, width: 140, depth: 70, height: 75, rotation: 90 },
       // Living & Dining
-      { id: 'l_sofa', type: 'sofa_3', category: 'living', x: 320, y: 550, width: 220, depth: 90, rotation: 0 },
-      { id: 'l_coffee', type: 'table_coffee', category: 'living', x: 320, y: 460, width: 100, depth: 60, rotation: 0 },
-      { id: 'l_tv', type: 'tv_unit', category: 'living', x: 80, y: 550, width: 140, depth: 40, rotation: 90 },
-      { id: 'd_table', type: 'table_dining_6', category: 'dining', x: 500, y: 460, width: 150, depth: 85, rotation: 0 },
+      { id: 'l_sofa', type: 'sofa_3', category: 'living', x: 320, y: 550, width: 220, depth: 90, height: 80, rotation: 0 },
+      { id: 'l_coffee', type: 'table_coffee', category: 'living', x: 320, y: 460, width: 110, depth: 60, height: 45, rotation: 0 },
+      { id: 'l_tv', type: 'tv_unit', category: 'living', x: 80, y: 550, width: 160, depth: 40, height: 50, rotation: 90 },
+      { id: 'd_table', type: 'table_dining_6', category: 'dining', x: 500, y: 460, width: 160, depth: 90, height: 75, rotation: 0 },
       // Kitchen
-      { id: 'k_sink', type: 'counter_sink', category: 'kitchen', x: 750, y: 640, width: 120, depth: 60, rotation: 0 },
-      { id: 'k_stove', type: 'stove', category: 'kitchen', x: 840, y: 640, width: 60, depth: 60, rotation: 0 },
+      { id: 'k_counter', type: 'counter', category: 'kitchen', x: 750, y: 640, width: 120, depth: 60, height: 90, rotation: 0 },
+      { id: 'k_stove', type: 'stove', category: 'kitchen', x: 840, y: 640, width: 60, depth: 60, height: 90, rotation: 0 },
       // Bath
-      { id: 'ba_tub', type: 'bathtub', category: 'bathroom', x: 750, y: 420, width: 150, depth: 75, rotation: 0 },
-      { id: 'ba_wc', type: 'toilet', category: 'bathroom', x: 860, y: 480, width: 45, depth: 70, rotation: 90 },
-      { id: 'ba_sink', type: 'sink', category: 'bathroom', x: 700, y: 480, width: 60, depth: 45, rotation: 90 },
+      { id: 'ba_tub', type: 'bathtub', category: 'bathroom', x: 750, y: 420, width: 160, depth: 75, height: 55, rotation: 0 },
+      { id: 'ba_wc', type: 'toilet', category: 'bathroom', x: 860, y: 480, width: 45, depth: 70, height: 75, rotation: 90 },
+      { id: 'ba_sink', type: 'sink', category: 'bathroom', x: 700, y: 480, width: 65, depth: 50, height: 85, rotation: 90 },
     ];
 
     const rooms: Room[] = [

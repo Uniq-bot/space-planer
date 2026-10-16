@@ -1,0 +1,11 @@
+Model Information:
+* title:	Round Table Furniture Model
+* source:	https://sketchfab.com/3d-models/round-table-furniture-model-6d283b09a88246758040d691d8e0ce51
+* author:	Jeremy (https://sketchfab.com/thedoctah)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Round Table Furniture Model" (https://sketchfab.com/3d-models/round-table-furniture-model-6d283b09a88246758040d691d8e0ce51) by Jeremy (https://sketchfab.com/thedoctah) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

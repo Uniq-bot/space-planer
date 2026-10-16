@@ -128,18 +128,31 @@ const createFurnitureMaterials = (isSel: boolean) => {
  * Builds high-fidelity procedural 3D furniture models
  * with proper architectural proportions, multi-part details, and PBR materials.
  */
+import { instantiateFurnitureModel } from './modelLoader';
+import { FURNITURE_CATALOG } from '../../constants/catalog';
+
 export function buildFurniture3D(
   sym: SymbolItem,
   isSel: boolean
 ): { group: THREE.Group; selectables: THREE.Mesh[] } {
+  // 1. Dimensions from symbol and catalog (with safe fallbacks)
+  const catalogItem = FURNITURE_CATALOG.find((c) => c.type === sym.type);
+  const w = Math.max(10, sym.width);
+  const d = Math.max(10, sym.depth);
+  const h = Math.max(10, sym.height ?? catalogItem?.height ?? 80);
+  const hw = w / 2;
+  const hd = d / 2;
+
+  // 2. High-Fidelity Custom 3D Model (GLTF / GLB)
+  const modelInstance = instantiateFurnitureModel(sym.type, w, h, d, sym.id, isSel);
+  if (modelInstance) {
+    return modelInstance;
+  }
+
+  // 3. Fallback to procedural architectural meshes while model loads or if no model exists
   const group = new THREE.Group();
   const selectables: THREE.Mesh[] = [];
   const mats = createFurnitureMaterials(isSel);
-
-  const w = Math.max(10, sym.width);
-  const d = Math.max(10, sym.depth);
-  const hw = w / 2;
-  const hd = d / 2;
 
   const addMesh = (mesh: THREE.Mesh) => {
     mesh.castShadow = true;
@@ -148,6 +161,8 @@ export function buildFurniture3D(
     group.add(mesh);
     selectables.push(mesh);
   };
+
+  // Duplicate dimension variables and addMesh function removed – they are defined earlier.
 
   switch (sym.type) {
     // ------------------------------------------------------------------------
@@ -932,7 +947,8 @@ export function buildFurniture3D(
     // ------------------------------------------------------------------------
     // 12. POTTED PLANT
     // ------------------------------------------------------------------------
-    case 'plant_indoor': {
+    case 'plant_indoor':
+    case 'plant_ficus': {
       const potR = Math.min(hw, hd) * 0.75;
       const potH = 42;
 
@@ -952,7 +968,6 @@ export function buildFurniture3D(
       const leafCount = 9;
       for (let i = 0; i < leafCount; i++) {
         const a = (i * Math.PI * 2) / leafCount;
-        const stemLen = 45 + Math.random() * 25;
         const stemH = 30 + Math.random() * 35;
 
         // Leaf blade geometry

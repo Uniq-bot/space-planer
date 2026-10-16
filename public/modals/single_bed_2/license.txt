@@ -1,0 +1,11 @@
+Model Information:
+* title:	Single Bed 2
+* source:	https://sketchfab.com/3d-models/single-bed-2-81ada0e24e1647d8a0d6d0708a696f84
+* author:	rhcreations (https://sketchfab.com/rhcreations)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Single Bed 2" (https://sketchfab.com/3d-models/single-bed-2-81ada0e24e1647d8a0d6d0708a696f84) by rhcreations (https://sketchfab.com/rhcreations) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
