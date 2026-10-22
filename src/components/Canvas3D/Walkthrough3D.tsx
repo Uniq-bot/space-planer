@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { FloorPlan, Wall, Opening, SymbolItem } from '../../types/floorplan';
+import { FloorPlan, Wall, Opening, SymbolItem, Room } from '../../types/floorplan';
 import { ThemeColors } from '../../constants/themes';
-import { createPBRMaterial } from '../../utils/textures';
+import { createPBRMaterial, WALL_MATERIALS, FLOOR_MATERIALS, WallMaterialType, FloorMaterialType } from '../../utils/textures';
 import { getArchitecturalEnvironment, disposeEnvironment } from '../../utils/pbrEnvironment';
+import { FURNITURE_CATALOG } from '../../constants/catalog';
 import { buildFurniture3D } from './furniture3D';
 import {
   preloadModelTypes,
@@ -14,8 +15,37 @@ import {
 
 export const DEFAULT_LOOK_SENSITIVITY = 0.0022;
 
+export interface TargetedObjectInfo {
+  id: string;
+  type: 'symbol' | 'wall' | 'room' | 'opening';
+  name: string;
+  materialName?: string;
+  width?: number;
+  depth?: number;
+  rotation?: number;
+  sym?: SymbolItem;
+  wall?: Wall;
+  room?: Room;
+  op?: Opening;
+}
+
+export interface CarryingItemInfo {
+  symId: string;
+  type: string;
+  name: string;
+  width: number;
+  depth: number;
+  currentX: number;
+  currentY: number;
+  currentRot: number;
+  origX: number;
+  origY: number;
+  origRot: number;
+}
+
 interface Walkthrough3DProps {
   plan: FloorPlan;
+  onUpdatePlan?: (newPlan: FloorPlan) => void;
   theme: ThemeColors;
   selectedIds: string[];
   onSelectIds: (ids: string[], isToggle?: boolean) => void;
@@ -24,6 +54,7 @@ interface Walkthrough3DProps {
 
 export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
   plan,
+  onUpdatePlan,
   theme,
   selectedIds,
   onSelectIds,
@@ -35,7 +66,11 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
   const [modelVersion, setModelVersion] = useState(0);
   const [isPointerLocked, setIsPointerLocked] = useState<boolean>(false);
 
-  // Persistent Three.js Core Refs (created once, preserved across updates)
+  // First-Person Interactive Targeting & Carrying State
+  const [targetedItem, setTargetedItem] = useState<TargetedObjectInfo | null>(null);
+  const [carryingItem, setCarryingItem] = useState<CarryingItemInfo | null>(null);
+
+  // Persistent Three.js Core Refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -43,17 +78,31 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
   const planGroupRef = useRef<THREE.Group | null>(null);
   const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
   const selectableMeshesRef = useRef<THREE.Mesh[]>([]);
+  const placementGuideRef = useRef<THREE.Mesh | null>(null);
 
-  // Synchronous State Refs to prevent stale callbacks and unwanted effect triggers
+  // Synchronous State Refs
   const cameraModeRef = useRef<'orbit' | 'firstPerson'>(cameraMode);
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const onSelectIdsRef = useRef(onSelectIds);
+  const onUpdatePlanRef = useRef(onUpdatePlan);
+  const planRef = useRef<FloorPlan>(plan);
   const isPointerLockedRef = useRef<boolean>(false);
   const sensitivityRef = useRef<number>(mouseSensitivity);
+  const targetedItemRef = useRef<TargetedObjectInfo | null>(null);
+  const carryingItemRef = useRef<CarryingItemInfo | null>(null);
+  const lastTargetKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     onSelectIdsRef.current = onSelectIds;
   }, [onSelectIds]);
+
+  useEffect(() => {
+    onUpdatePlanRef.current = onUpdatePlan;
+  }, [onUpdatePlan]);
+
+  useEffect(() => {
+    planRef.current = plan;
+  }, [plan]);
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -141,7 +190,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // 4. Smooth OrbitControls with damping, zooming, panning, and rotation enabled
+    // 4. Smooth OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
     controlsRef.current = controls;
     controls.enableDamping = true;
@@ -157,12 +206,12 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     controls.enabled = cameraModeRef.current === 'orbit';
     controls.update();
 
-    // 5. High-Fidelity PMREM Environment Lighting for Realistic PBR Reflections
+    // 5. PMREM Environment Lighting
     const envTexture = getArchitecturalEnvironment(renderer);
     scene.environment = envTexture;
     scene.environmentIntensity = 0.90;
 
-    // 6. Balanced Multi-Source Architectural Lighting
+    // 6. Lighting
     const ambientLight = new THREE.AmbientLight(0xfff7ee, 0.55);
     scene.add(ambientLight);
 
@@ -170,7 +219,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     hemiLight.position.set(0, 1500, 0);
     scene.add(hemiLight);
 
-    // Primary warm sunlight with soft contact shadows
     const shadowRadius = initialSpan * 0.75 + 150;
     const sunLight = new THREE.DirectionalLight(0xfffaed, 1.25);
     sunLightRef.current = sunLight;
@@ -190,7 +238,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     sunLight.shadow.normalBias = 0.025;
     scene.add(sunLight);
 
-    // Secondary soft sky fill light from opposite angle to reveal details
     const fillLight = new THREE.DirectionalLight(0xbfdbfe, 0.40);
     fillLight.position.set(centerX - 600, 1100, centerY - 500);
     scene.add(fillLight);
@@ -200,12 +247,35 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     gridHelper.position.y = -0.5;
     scene.add(gridHelper);
 
-    // 8. Container Group for all plan geometry (walls, floors, furniture)
+    // 8. Visual Placement Guide Ring on Floor for First-Person Carrying
+    const guideGeom = new THREE.RingGeometry(35, 42, 32);
+    guideGeom.rotateX(-Math.PI / 2);
+    const guideMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false
+    });
+    const placementGuide = new THREE.Mesh(guideGeom, guideMat);
+    placementGuide.position.set(0, 0.4, 0);
+    placementGuide.visible = false;
+    placementGuideRef.current = placementGuide;
+    scene.add(placementGuide);
+
+    // 9. Container Group for all plan geometry (walls, floors, furniture)
     const planGroup = new THREE.Group();
     planGroupRef.current = planGroup;
     scene.add(planGroup);
 
-    // 9. Continuous Animation Loop (Synchronized & direct response, zero input lag)
+    // 10. Center Raycaster for First-Person Crosshair Targeting
+    const centerRaycaster = new THREE.Raycaster();
+    centerRaycaster.far = 800; // 8 meters reach
+
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const floorHit = new THREE.Vector3();
+
+    // 11. Continuous Animation Loop with Real-Time First-Person Game Interaction
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -214,7 +284,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         controls.update();
       } else {
         const fp = fpState.current;
-        // Direction vectors strictly parallel to ground (no unexpected vertical drift)
+        // Horizontal movement vectors
         const fwdX = -Math.sin(fp.yaw);
         const fwdZ = -Math.cos(fp.yaw);
         const rgtX = Math.cos(fp.yaw);
@@ -230,15 +300,13 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
 
         const moveLen = Math.hypot(moveX, moveZ);
         if (moveLen > 0.0001) {
-          const speed = fp.keys.shift ? 7.0 : 4.0; // cm per frame
+          const speed = fp.keys.shift ? 7.0 : 4.0;
           fp.pos.x += (moveX / moveLen) * speed;
           fp.pos.z += (moveZ / moveLen) * speed;
         }
 
-        // Camera position remains locked to eye height
         camera.position.copy(fp.pos);
 
-        // Direction strictly clamped to prevent camera flipping
         const cosP = Math.cos(fp.pitch);
         const sinP = Math.sin(fp.pitch);
         const lookX = -Math.sin(fp.yaw) * cosP;
@@ -246,18 +314,145 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         const lookZ = -Math.cos(fp.yaw) * cosP;
 
         camera.lookAt(fp.pos.x + lookX, fp.pos.y + lookY, fp.pos.z + lookZ);
+
+        // --- FIRST PERSON CROSSHAIR INTERACTION & CARRYING UPDATE ---
+        centerRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+        const carried = carryingItemRef.current;
+        if (carried) {
+          // Calculate ground projection point in front of player
+          const hit = centerRaycaster.ray.intersectPlane(floorPlane, floorHit);
+          const distToHit = hit ? Math.hypot(floorHit.x - fp.pos.x, floorHit.z - fp.pos.z) : 9999;
+
+          let placeX: number;
+          let placeZ: number;
+
+          if (hit && distToHit >= 80 && distToHit <= 550 && centerRaycaster.ray.direction.y < -0.05) {
+            placeX = floorHit.x;
+            placeZ = floorHit.z;
+          } else {
+            placeX = fp.pos.x + fwdX * 220;
+            placeZ = fp.pos.z + fwdZ * 220;
+          }
+
+          // Snap to clean 10cm grid
+          placeX = Math.round(placeX / 10) * 10;
+          placeZ = Math.round(placeZ / 10) * 10;
+
+          carried.currentX = placeX;
+          carried.currentY = placeZ;
+
+          // Move the carried furniture group in Three.js scene in real-time
+          const symGroup = planGroup.children.find(
+            (c) => c.userData?.id === carried.symId && c.userData?.type === 'symbolGroup'
+          );
+          if (symGroup) {
+            symGroup.position.set(placeX, 0, placeZ);
+            symGroup.rotation.y = -((carried.currentRot * Math.PI) / 180);
+          }
+
+          // Update placement guide ring
+          if (placementGuideRef.current) {
+            placementGuideRef.current.visible = true;
+            placementGuideRef.current.position.set(placeX, 0.4, placeZ);
+          }
+        } else {
+          if (placementGuideRef.current) {
+            placementGuideRef.current.visible = false;
+          }
+
+          // Perform raycasting against interactive objects
+          const hits = centerRaycaster.intersectObjects(selectableMeshesRef.current, false);
+          let nextTarget: TargetedObjectInfo | null = null;
+
+          if (hits.length > 0) {
+            const hitMesh = hits[0].object as THREE.Mesh;
+            let curr: THREE.Object3D | null = hitMesh;
+            let foundId: string | null = null;
+            let foundType: string | null = null;
+
+            while (curr && curr !== scene) {
+              if (curr.userData && curr.userData.id) {
+                foundId = curr.userData.id;
+                foundType = curr.userData.type;
+                break;
+              }
+              curr = curr.parent;
+            }
+
+            if (foundId && planRef.current) {
+              const p = planRef.current;
+              if (foundType === 'symbol' || foundType === 'symbolGroup') {
+                const sym = p.symbols.find((s) => s.id === foundId);
+                if (sym) {
+                  const cat = FURNITURE_CATALOG.find((c) => c.type === sym.type);
+                  nextTarget = {
+                    id: sym.id,
+                    type: 'symbol',
+                    name: cat?.name || sym.type.replace(/_/g, ' '),
+                    width: sym.width,
+                    depth: sym.depth,
+                    rotation: sym.rotation || 0,
+                    sym
+                  };
+                }
+              } else if (foundType === 'wall') {
+                const wall = p.walls.find((w) => w.id === foundId);
+                if (wall) {
+                  const mat = WALL_MATERIALS.find((m) => m.id === (wall.material || 'clean_white'));
+                  nextTarget = {
+                    id: wall.id,
+                    type: 'wall',
+                    name: 'Wall',
+                    materialName: mat?.name || 'Architectural White',
+                    wall
+                  };
+                }
+              } else if (foundType === 'room') {
+                const room = p.rooms.find((r) => r.id === foundId);
+                if (room) {
+                  const mat = FLOOR_MATERIALS.find((m) => m.id === (room.floorMaterial || 'oak_wood'));
+                  nextTarget = {
+                    id: room.id,
+                    type: 'room',
+                    name: room.name || 'Room Floor',
+                    materialName: mat?.name || 'Natural Oak Planks',
+                    room
+                  };
+                }
+              } else if (foundType === 'opening') {
+                const op = p.openings.find((o) => o.id === foundId);
+                if (op) {
+                  nextTarget = {
+                    id: op.id,
+                    type: 'opening',
+                    name: op.type === 'door' ? 'Door Opening' : 'Window Opening',
+                    op
+                  };
+                }
+              }
+            }
+          }
+
+          const targetKey = nextTarget ? `${nextTarget.type}_${nextTarget.id}` : null;
+          if (targetKey !== lastTargetKeyRef.current) {
+            lastTargetKeyRef.current = targetKey;
+            targetedItemRef.current = nextTarget;
+            setTargetedItem(nextTarget);
+          }
+        }
       }
 
       renderer.render(scene, camera);
     };
     animate();
 
-    // 10. Responsive ResizeObserver
+    // 12. Responsive ResizeObserver
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
-      const rect = container.getBoundingClientRect();
-      const newW = Math.round(rect.width);
-      const newH = Math.round(rect.height);
+      const r = container.getBoundingClientRect();
+      const newW = Math.round(r.width);
+      const newH = Math.round(r.height);
       if (newW > 0 && newH > 0) {
         camera.aspect = newW / newH;
         camera.updateProjectionMatrix();
@@ -269,7 +464,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     resizeObserver.observe(container);
     window.addEventListener('resize', handleResize);
 
-    // 11. Pointer Lock, Mouse & Keyboard Event Handlers
+    // 13. Pointer Lock, Mouse & Keyboard Event Handlers
     const raycaster = new THREE.Raycaster();
     const dom = renderer.domElement;
 
@@ -278,7 +473,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       setIsPointerLocked(locked);
       isPointerLockedRef.current = locked;
       if (!locked) {
-        // Reset keys on lock release (Escape or blur)
         const k = fpState.current.keys;
         k.forward = false;
         k.backward = false;
@@ -293,18 +487,177 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       isPointerLockedRef.current = false;
     };
 
+    // First-Person Interactive Action Functions
+    const executeDropCarriedItem = () => {
+      const carried = carryingItemRef.current;
+      if (carried && onUpdatePlanRef.current && planRef.current) {
+        onUpdatePlanRef.current({
+          ...planRef.current,
+          symbols: planRef.current.symbols.map((s) =>
+            s.id === carried.symId
+              ? { ...s, x: carried.currentX, y: carried.currentY, rotation: carried.currentRot }
+              : s
+          )
+        });
+        onSelectIdsRef.current([carried.symId]);
+        setCarryingItem(null);
+        carryingItemRef.current = null;
+        if (placementGuideRef.current) placementGuideRef.current.visible = false;
+      }
+    };
+
+    const cancelCarriedItem = () => {
+      const carried = carryingItemRef.current;
+      if (carried) {
+        const symGroup = planGroup.children.find(
+          (c) => c.userData?.id === carried.symId && c.userData?.type === 'symbolGroup'
+        );
+        if (symGroup) {
+          symGroup.position.set(carried.origX, 0, carried.origY);
+          symGroup.rotation.y = -((carried.origRot * Math.PI) / 180);
+        }
+        setCarryingItem(null);
+        carryingItemRef.current = null;
+        if (placementGuideRef.current) placementGuideRef.current.visible = false;
+      }
+    };
+
+    const startCarryingItem = (sym: SymbolItem) => {
+      const cat = FURNITURE_CATALOG.find((c) => c.type === sym.type);
+      const info: CarryingItemInfo = {
+        symId: sym.id,
+        type: sym.type,
+        name: cat?.name || sym.type.replace(/_/g, ' '),
+        width: sym.width,
+        depth: sym.depth,
+        currentX: sym.x,
+        currentY: sym.y,
+        currentRot: sym.rotation || 0,
+        origX: sym.x,
+        origY: sym.y,
+        origRot: sym.rotation || 0
+      };
+      carryingItemRef.current = info;
+      setCarryingItem(info);
+      onSelectIdsRef.current([sym.id]);
+    };
+
+    const rotateItemAction = (stepDeg = 45) => {
+      const carried = carryingItemRef.current;
+      if (carried) {
+        carried.currentRot = Math.round((carried.currentRot + stepDeg + 360) % 360);
+        setCarryingItem({ ...carried });
+        return;
+      }
+
+      const targeted = targetedItemRef.current;
+      if (targeted && targeted.type === 'symbol' && targeted.sym && onUpdatePlanRef.current && planRef.current) {
+        const nextRot = Math.round(((targeted.sym.rotation || 0) + stepDeg + 360) % 360);
+        onUpdatePlanRef.current({
+          ...planRef.current,
+          symbols: planRef.current.symbols.map((s) =>
+            s.id === targeted.id ? { ...s, rotation: nextRot } : s
+          )
+        });
+        onSelectIdsRef.current([targeted.id]);
+      }
+    };
+
+    const cycleMaterialAction = () => {
+      const targeted = targetedItemRef.current;
+      if (!targeted || !onUpdatePlanRef.current || !planRef.current) return;
+
+      if (targeted.type === 'wall' && targeted.wall) {
+        const currMat = (targeted.wall.material || 'clean_white') as WallMaterialType;
+        const idx = WALL_MATERIALS.findIndex((m) => m.id === currMat);
+        const nextMat = WALL_MATERIALS[(idx + 1) % WALL_MATERIALS.length].id;
+        onUpdatePlanRef.current({
+          ...planRef.current,
+          walls: planRef.current.walls.map((w) =>
+            w.id === targeted.id ? { ...w, material: nextMat } : w
+          )
+        });
+        onSelectIdsRef.current([targeted.id]);
+      } else if (targeted.type === 'room' && targeted.room) {
+        const currMat = (targeted.room.floorMaterial || 'oak_wood') as FloorMaterialType;
+        const idx = FLOOR_MATERIALS.findIndex((m) => m.id === currMat);
+        const nextMat = FLOOR_MATERIALS[(idx + 1) % FLOOR_MATERIALS.length].id;
+        onUpdatePlanRef.current({
+          ...planRef.current,
+          rooms: planRef.current.rooms.map((r) =>
+            r.id === targeted.id ? { ...r, floorMaterial: nextMat } : r
+          )
+        });
+        onSelectIdsRef.current([targeted.id]);
+      }
+    };
+
+    const deleteTargetedAction = () => {
+      const targeted = targetedItemRef.current;
+      if (!targeted || !onUpdatePlanRef.current || !planRef.current) return;
+      const id = targeted.id;
+      onUpdatePlanRef.current({
+        ...planRef.current,
+        symbols: planRef.current.symbols.filter((s) => s.id !== id),
+        walls: planRef.current.walls.filter((w) => w.id !== id),
+        rooms: planRef.current.rooms.filter((r) => r.id !== id),
+        openings: planRef.current.openings.filter((o) => o.id !== id && o.wall_id !== id)
+      });
+      onSelectIdsRef.current([]);
+      targetedItemRef.current = null;
+      setTargetedItem(null);
+    };
+
+    const duplicateTargetedAction = () => {
+      const targeted = targetedItemRef.current;
+      if (!targeted || targeted.type !== 'symbol' || !targeted.sym || !onUpdatePlanRef.current || !planRef.current) return;
+      const s = targeted.sym;
+      const newId = `sym_${Date.now()}`;
+      const newSym: SymbolItem = {
+        ...s,
+        id: newId,
+        x: s.x + 30,
+        y: s.y + 30
+      };
+      onUpdatePlanRef.current({
+        ...planRef.current,
+        symbols: [...planRef.current.symbols, newSym]
+      });
+      onSelectIdsRef.current([newId]);
+      startCarryingItem(newSym);
+    };
+
     const handleMouseDown = (e: MouseEvent) => {
       clickStartRef.current = { x: e.clientX, y: e.clientY };
 
-      if (cameraModeRef.current === 'firstPerson' && e.button === 0) {
+      if (cameraModeRef.current === 'firstPerson') {
         if (!isPointerLockedRef.current) {
-          try {
-            const res = dom.requestPointerLock() as any;
-            if (res && typeof res.catch === 'function') {
-              res.catch(() => {});
+          if (e.button === 0) {
+            try {
+              const res = dom.requestPointerLock() as any;
+              if (res && typeof res.catch === 'function') res.catch(() => {});
+            } catch {}
+          }
+        } else {
+          // In pointer lock: Left click = Interact / Grab / Place
+          if (e.button === 0) {
+            if (carryingItemRef.current) {
+              executeDropCarriedItem();
+            } else if (targetedItemRef.current) {
+              const target = targetedItemRef.current;
+              if (target.type === 'symbol' && target.sym) {
+                startCarryingItem(target.sym);
+              } else {
+                onSelectIdsRef.current([target.id]);
+              }
             }
-          } catch {
-            // Pointer lock not permitted in this context
+          } else if (e.button === 2) {
+            // Right click = Cancel carry or Deselect
+            if (carryingItemRef.current) {
+              cancelCarriedItem();
+            } else {
+              onSelectIdsRef.current([]);
+            }
           }
         }
       }
@@ -317,16 +670,15 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
           const mx = e.movementX ?? (e as any).mozMovementX ?? (e as any).webkitMovementX ?? 0;
           const my = e.movementY ?? (e as any).mozMovementY ?? (e as any).webkitMovementY ?? 0;
 
-          // Stable yaw & pitch deltas
           fpState.current.yaw -= mx * sens;
-          const maxPitch = Math.PI * 0.48; // ~86.4 degrees to prevent flipping/gimbal lock
+          const maxPitch = Math.PI * 0.48; // ~86.4 degrees
           fpState.current.pitch = Math.max(-maxPitch, Math.min(maxPitch, fpState.current.pitch - my * sens));
         }
       } else if (cameraModeRef.current === 'orbit') {
-        const rect = dom.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-          const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        const r = dom.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          const mouseX = ((e.clientX - r.left) / r.width) * 2 - 1;
+          const mouseY = -((e.clientY - r.top) / r.height) * 2 + 1;
           raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
           const hits = raycaster.intersectObjects(selectableMeshesRef.current, false);
           dom.style.cursor = hits.length > 0 ? 'pointer' : 'default';
@@ -337,10 +689,10 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     const handleMouseUp = (e: MouseEvent) => {
       const dist = Math.hypot(e.clientX - clickStartRef.current.x, e.clientY - clickStartRef.current.y);
       if (dist < 6 && cameraModeRef.current === 'orbit') {
-        const rect = dom.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        const r = dom.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return;
+        const mouseX = ((e.clientX - r.left) / r.width) * 2 - 1;
+        const mouseY = -((e.clientY - r.top) / r.height) * 2 + 1;
 
         raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
         const intersects = raycaster.intersectObjects(selectableMeshesRef.current, false);
@@ -367,6 +719,14 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       }
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      if (cameraModeRef.current === 'firstPerson') {
+        e.preventDefault();
+        const step = e.deltaY > 0 ? 15 : -15;
+        rotateItemAction(step);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (cameraModeRef.current === 'firstPerson') {
         if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
@@ -379,6 +739,46 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
           fpState.current.keys.right = true;
         } else if (e.key === 'Shift') {
           fpState.current.keys.shift = true;
+        } else if (e.key === 'e' || e.key === 'E') {
+          // [E] Interact / Grab / Place
+          if (carryingItemRef.current) {
+            executeDropCarriedItem();
+          } else if (targetedItemRef.current) {
+            const target = targetedItemRef.current;
+            if (target.type === 'symbol' && target.sym) {
+              startCarryingItem(target.sym);
+            } else {
+              onSelectIdsRef.current([target.id]);
+            }
+          }
+        } else if (e.key === 'r' || e.key === 'R') {
+          // [R] Rotate 45 degrees
+          rotateItemAction(e.shiftKey ? -45 : 45);
+        } else if (e.key === 'm' || e.key === 'M') {
+          // [M] Quick Cycle Material
+          cycleMaterialAction();
+        } else if (e.key === 'c' || e.key === 'C') {
+          // [C] Duplicate
+          duplicateTargetedAction();
+        } else if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'x' || e.key === 'X') {
+          // [Del / X] Delete targeted
+          deleteTargetedAction();
+        } else if (e.key === 'Escape') {
+          if (carryingItemRef.current) {
+            cancelCarriedItem();
+          }
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          if (isPointerLockedRef.current) {
+            if (document.pointerLockElement) {
+              try { document.exitPointerLock(); } catch {}
+            }
+          } else {
+            try {
+              const res = dom.requestPointerLock() as any;
+              if (res && typeof res.catch === 'function') res.catch(() => {});
+            } catch {}
+          }
         }
       }
     };
@@ -408,9 +808,17 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       k.shift = false;
     };
 
+    const handleContextMenu = (e: MouseEvent) => {
+      if (cameraModeRef.current === 'firstPerson') {
+        e.preventDefault();
+      }
+    };
+
     dom.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    dom.addEventListener('wheel', handleWheel, { passive: false });
+    dom.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
@@ -424,6 +832,8 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       dom.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      dom.removeEventListener('wheel', handleWheel);
+      dom.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
@@ -431,9 +841,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       document.removeEventListener('pointerlockerror', handlePointerLockError);
 
       if (document.pointerLockElement === dom) {
-        try {
-          document.exitPointerLock();
-        } catch {}
+        try { document.exitPointerLock(); } catch {}
       }
 
       controls.dispose();
@@ -698,6 +1106,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     plan.symbols.forEach((sym: SymbolItem) => {
       const isSel = selectedIdsRef.current.includes(sym.id);
       const { group: symGroup, selectables } = buildFurniture3D(sym, isSel);
+      symGroup.userData = { id: sym.id, type: 'symbolGroup' };
       symGroup.position.set(sym.x, 0, sym.y);
       symGroup.rotation.y = -((sym.rotation || 0) * Math.PI) / 180;
       planGroup.add(symGroup);
@@ -772,7 +1181,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     if (!camera || !controls) return;
 
     if (cameraMode === 'orbit') {
-      // Exit pointer lock if active (pointerlockchange event will update state)
       if (document.pointerLockElement) {
         try {
           document.exitPointerLock();
@@ -785,6 +1193,10 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       camera.getWorldDirection(dir);
       controls.target.copy(camera.position).addScaledVector(dir, 350);
       controls.update();
+
+      if (placementGuideRef.current) placementGuideRef.current.visible = false;
+      carryingItemRef.current = null;
+      targetedItemRef.current = null;
     } else {
       controls.enabled = false;
       const dir = new THREE.Vector3();
@@ -792,7 +1204,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       fpState.current.yaw = Math.atan2(-dir.x, -dir.z);
       fpState.current.pitch = Math.asin(Math.max(-0.99, Math.min(0.99, dir.y)));
 
-      // If user was viewing from high aerial camera, place at natural eye height
       if (camera.position.y > 280) {
         fpState.current.pos.set(camera.position.x, 160, camera.position.z);
         camera.position.copy(fpState.current.pos);
@@ -800,7 +1211,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         fpState.current.pos.copy(camera.position);
       }
 
-      // Reset movement keys
       const k = fpState.current.keys;
       k.forward = false;
       k.backward = false;
@@ -809,6 +1219,17 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       k.shift = false;
     }
   }, [cameraMode]);
+
+  const kbdStyle: React.CSSProperties = {
+    background: 'rgba(255, 255, 255, 0.2)',
+    padding: '2px 6px',
+    borderRadius: 4,
+    fontWeight: 700,
+    fontSize: 10,
+    fontFamily: 'monospace',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    color: '#ffffff'
+  };
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -836,6 +1257,10 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         <button
           onClick={() => {
             const nextMode = cameraMode === 'orbit' ? 'firstPerson' : 'orbit';
+            if (nextMode === 'orbit') {
+              setCarryingItem(null);
+              setTargetedItem(null);
+            }
             setCameraMode(nextMode);
           }}
           style={{
@@ -869,7 +1294,7 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         </button>
       </div>
 
-      {/* First-Person Mode HUD & Prompt */}
+      {/* First-Person Mode HUD & Interactive Gaming Prompts */}
       {cameraMode === 'firstPerson' && (
         <>
           {/* Interactive Entry Banner when not pointer locked */}
@@ -889,63 +1314,229 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                background: 'rgba(15, 23, 42, 0.90)',
+                background: 'rgba(15, 23, 42, 0.92)',
                 backdropFilter: 'blur(10px)',
-                padding: '16px 28px',
-                borderRadius: 12,
+                padding: '18px 30px',
+                borderRadius: 14,
                 color: '#ffffff',
                 textAlign: 'center',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
                 cursor: 'pointer',
-                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.2)',
                 userSelect: 'none',
-                zIndex: 20
+                zIndex: 25
               }}
             >
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
-                🖱️ Click to Enter Mouse Look
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: '#38bdf8' }}>
+                🎮 Click to Enter Interactive Walk Mode
               </div>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>
-                Move: <b>W A S D</b> (Shift to sprint) • Look: <b>Mouse</b> • Exit: <b>Esc</b>
+              <div style={{ fontSize: 12, opacity: 0.9, lineHeight: 1.6 }}>
+                Walk: <b>W A S D</b> (Shift to sprint) • Look: <b>Mouse</b><br />
+                Grab & Move Furniture: <b>E / Left Click</b> • Rotate: <b>R / Wheel</b><br />
+                Cycle Wall/Floor Finish: <b>M</b> • Delete: <b>Del</b> • Exit: <b>Esc</b>
               </div>
             </div>
           ) : (
             <>
-              {/* Subtle Central Reticle */}
+              {/* Dynamic Game Crosshair Reticle */}
               <div
                 style={{
                   position: 'absolute',
                   top: '50%',
                   left: '50%',
-                  width: 4,
-                  height: 4,
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 4px rgba(0, 0, 0, 0.6)',
                   transform: 'translate(-50%, -50%)',
                   pointerEvents: 'none',
-                  zIndex: 15
+                  zIndex: 20
                 }}
-              />
-              {/* Bottom active pill */}
+              >
+                {carryingItem ? (
+                  // Carrying Active State (Cyan Target Ring)
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      border: '2px dashed #38bdf8',
+                      boxShadow: '0 0 10px rgba(56, 189, 248, 0.7)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#38bdf8' }} />
+                  </div>
+                ) : targetedItem ? (
+                  // Targeting Interactive Object
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      border: '2px solid #38bdf8',
+                      boxShadow: '0 0 8px rgba(56, 189, 248, 0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#ffffff' }} />
+                  </div>
+                ) : (
+                  // Default Minimal Reticle
+                  <div
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      boxShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Dynamic In-Game Action Tooltip attached near Crosshair */}
+              {carryingItem ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(50% + 28px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(15, 23, 42, 0.90)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '8px 16px',
+                    borderRadius: 10,
+                    border: '1px solid #38bdf8',
+                    color: '#ffffff',
+                    fontSize: 12,
+                    textAlign: 'center',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    pointerEvents: 'none',
+                    zIndex: 20
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700, color: '#38bdf8' }}>
+                    <span>📦 Carrying:</span>
+                    <span>{carryingItem.name}</span>
+                    <span style={{ fontSize: 11, opacity: 0.75, fontFamily: 'monospace' }}>
+                      ({carryingItem.currentRot}°)
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11, opacity: 0.95 }}>
+                    <span><kbd style={kbdStyle}>Click / E</kbd> Place on Floor</span>
+                    <span><kbd style={kbdStyle}>R / Wheel</kbd> Rotate</span>
+                    <span><kbd style={kbdStyle}>Right Click / Esc</kbd> Cancel</span>
+                  </div>
+                </div>
+              ) : targetedItem ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(50% + 28px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(15, 23, 42, 0.88)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '8px 16px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(56, 189, 248, 0.5)',
+                    color: '#ffffff',
+                    fontSize: 12,
+                    textAlign: 'center',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    pointerEvents: 'none',
+                    zIndex: 20
+                  }}
+                >
+                  {targetedItem.type === 'symbol' && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}>
+                        <span>🛋️ {targetedItem.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.7, fontFamily: 'monospace' }}>
+                          {targetedItem.width}×{targetedItem.depth} cm
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11 }}>
+                        <span><kbd style={kbdStyle}>Click / E</kbd> Pick Up</span>
+                        <span><kbd style={kbdStyle}>R</kbd> Rotate</span>
+                        <span><kbd style={kbdStyle}>C</kbd> Clone</span>
+                        <span><kbd style={kbdStyle}>Del</kbd> Delete</span>
+                      </div>
+                    </>
+                  )}
+
+                  {targetedItem.type === 'wall' && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}>
+                        <span>🧱 {targetedItem.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.75, color: '#38bdf8' }}>
+                          [{targetedItem.materialName}]
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11 }}>
+                        <span><kbd style={kbdStyle}>Click</kbd> Select</span>
+                        <span><kbd style={kbdStyle}>M</kbd> Cycle Finish</span>
+                        <span><kbd style={kbdStyle}>Del</kbd> Delete</span>
+                      </div>
+                    </>
+                  )}
+
+                  {targetedItem.type === 'room' && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}>
+                        <span>🪵 {targetedItem.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.75, color: '#38bdf8' }}>
+                          [{targetedItem.materialName}]
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11 }}>
+                        <span><kbd style={kbdStyle}>Click</kbd> Select Room</span>
+                        <span><kbd style={kbdStyle}>M</kbd> Cycle Floor</span>
+                      </div>
+                    </>
+                  )}
+
+                  {targetedItem.type === 'opening' && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}>
+                        <span>{targetedItem.name.includes('Door') ? '🚪' : '🪟'} {targetedItem.name}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11 }}>
+                        <span><kbd style={kbdStyle}>Click</kbd> Select</span>
+                        <span><kbd style={kbdStyle}>Del</kbd> Delete</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Bottom Quick Reference Bar */}
               <div
                 style={{
                   position: 'absolute',
-                  bottom: 24,
+                  bottom: 20,
                   left: '50%',
                   transform: 'translateX(-50%)',
                   background: 'rgba(15, 23, 42, 0.85)',
                   backdropFilter: 'blur(6px)',
-                  padding: '8px 18px',
+                  padding: '6px 18px',
                   borderRadius: 20,
                   color: '#ffffff',
-                  fontSize: 12,
+                  fontSize: 11,
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   pointerEvents: 'none',
-                  zIndex: 15
+                  zIndex: 15,
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'center'
                 }}
               >
-                Mouse Look Active • Press <b>Esc</b> to release cursor • Move: <b>W A S D</b>
+                <span>Move: <b>W A S D</b> (Shift to sprint)</span>
+                <span>•</span>
+                <span>Aim & Click to interact</span>
+                <span>•</span>
+                <span>Press <b>Tab</b> or <b>Esc</b> to release cursor</span>
               </div>
             </>
           )}

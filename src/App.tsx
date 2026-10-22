@@ -377,6 +377,7 @@ export const App: React.FC = () => {
           ) : (
             <Walkthrough3D
               plan={plan}
+              onUpdatePlan={handleUpdatePlan}
               theme={currentTheme}
               selectedIds={selectedIds}
               onSelectIds={handleSelectIds}
