@@ -29,7 +29,7 @@ export const App: React.FC = () => {
     try {
       const saved = localStorage.getItem('sp.editor.plan_v1');
       if (saved) return JSON.parse(saved);
-    } catch (e) {
+    } catch {
       // Fallback
     }
     return TEMPLATES['studio-apartment']();
@@ -55,7 +55,7 @@ export const App: React.FC = () => {
     try {
       localStorage.setItem('sp.editor.theme', themeName);
       localStorage.setItem('sp.editor.plan_v1', JSON.stringify(plan));
-    } catch (e) {
+    } catch {
       // storage quota or blocked
     }
   }, [themeName, plan]);
@@ -119,18 +119,104 @@ export const App: React.FC = () => {
     setSelectedIds([]);
   }, [selectedIds, plan, handleUpdatePlan]);
 
-  // Add piece directly from catalog
+  // Determines a sensible, valid, non-overlapping location within the active plan
+  const findSensiblePlacementPosition = (itemWidth: number, itemDepth: number): { x: number; y: number } => {
+    let refX = 300;
+    let refY = 250;
+
+    if (plan.rooms.length > 0) {
+      // Pick the room with the fewest placed symbols to distribute furniture pleasantly
+      const roomOccupancies = plan.rooms.map((room) => {
+        const rw = room.width || (room.area ? Math.sqrt(room.area) * 100 : 380);
+        const rh = room.height || (room.area ? Math.sqrt(room.area) * 100 : 340);
+        const count = plan.symbols.filter(
+          (s) => Math.abs(s.x - room.x) <= rw / 2 && Math.abs(s.y - room.y) <= rh / 2
+        ).length;
+        return { room, count };
+      });
+      roomOccupancies.sort((a, b) => a.count - b.count);
+      refX = roomOccupancies[0].room.x;
+      refY = roomOccupancies[0].room.y;
+    } else if (plan.walls.length > 0) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      plan.walls.forEach((w) => {
+        minX = Math.min(minX, w.x1, w.x2);
+        maxX = Math.max(maxX, w.x1, w.x2);
+        minY = Math.min(minY, w.y1, w.y2);
+        maxY = Math.max(maxY, w.y1, w.y2);
+      });
+      if (isFinite(minX)) {
+        refX = (minX + maxX) / 2;
+        refY = (minY + maxY) / 2;
+      }
+    }
+
+    const startX = Math.round(refX / 25) * 25;
+    const startY = Math.round(refY / 25) * 25;
+
+    const candidateOffsets: { dx: number; dy: number }[] = [
+      { dx: 0, dy: 0 },
+      { dx: 50, dy: 50 },
+      { dx: -50, dy: 50 },
+      { dx: 50, dy: -50 },
+      { dx: -50, dy: -50 },
+      { dx: 100, dy: 0 },
+      { dx: -100, dy: 0 },
+      { dx: 0, dy: 100 },
+      { dx: 0, dy: -100 },
+      { dx: 100, dy: 100 },
+      { dx: -100, dy: 100 },
+      { dx: 100, dy: -100 },
+      { dx: -100, dy: -100 },
+      { dx: 150, dy: 50 },
+      { dx: -150, dy: 50 },
+      { dx: 50, dy: 150 },
+      { dx: -50, dy: 150 }
+    ];
+
+    for (const off of candidateOffsets) {
+      const candX = startX + off.dx;
+      const candY = startY + off.dy;
+
+      const collision = plan.symbols.some((s) => {
+        const halfW = (s.width + itemWidth) / 2;
+        const halfD = (s.depth + itemDepth) / 2;
+        return Math.abs(s.x - candX) < halfW * 0.70 && Math.abs(s.y - candY) < halfD * 0.70;
+      });
+
+      if (!collision) {
+        return { x: candX, y: candY };
+      }
+    }
+
+    const lastSym = plan.symbols[plan.symbols.length - 1];
+    if (lastSym) {
+      return {
+        x: Math.round((lastSym.x + 50) / 25) * 25,
+        y: Math.round((lastSym.y + 50) / 25) * 25
+      };
+    }
+
+    return { x: startX, y: startY };
+  };
+
+  // Add piece directly from catalog with sensible, non-overlapping positioning
   const handleAddItemDirectly = (type: string) => {
     const catalogItem = FURNITURE_CATALOG.find((item) => item.type === type);
+    const w = catalogItem?.width || 120;
+    const d = catalogItem?.depth || 60;
+    const h = catalogItem?.height || 80;
+    const pos = findSensiblePlacementPosition(w, d);
+
     const newSym: SymbolItem = {
       id: `sym_${Date.now()}`,
       type,
       category: catalogItem?.category || 'living',
-      x: 300,
-      y: 250,
-      width: catalogItem?.width || 120,
-      depth: catalogItem?.depth || 60,
-      height: catalogItem?.height || 80,
+      x: pos.x,
+      y: pos.y,
+      width: w,
+      depth: d,
+      height: h,
       rotation: 0
     };
     handleUpdatePlan({
@@ -172,7 +258,7 @@ export const App: React.FC = () => {
         handleUpdatePlan(parsed);
         setSelectedIds([]);
       }
-    } catch (e) {
+    } catch {
       alert('Invalid FloorPlan JSON file format.');
     }
   };
@@ -205,27 +291,29 @@ export const App: React.FC = () => {
         handleDeleteSelected();
       } else if (e.key === 'Escape') {
         setSelectedIds([]);
-        setTool('select');
-      } else if (e.key === 'v' || e.key === 'V') {
-        setTool('select');
-      } else if (e.key === 'h' || e.key === 'H') {
-        setTool('pan');
-      } else if (e.key === 'w' || e.key === 'W') {
-        setTool('wall');
-      } else if (e.key === 'r' || e.key === 'R') {
-        setTool('room');
-      } else if (e.key === 'd' || e.key === 'D') {
-        setTool('door');
-      } else if (e.key === 'o' || e.key === 'O') {
-        setTool('window');
-      } else if (e.key === 'm' || e.key === 'M') {
-        setTool('measure');
+        if (viewMode === '2D') setTool('select');
+      } else if (viewMode === '2D') {
+        if (e.key === 'v' || e.key === 'V') {
+          setTool('select');
+        } else if (e.key === 'h' || e.key === 'H') {
+          setTool('pan');
+        } else if (e.key === 'w' || e.key === 'W') {
+          setTool('wall');
+        } else if (e.key === 'r' || e.key === 'R') {
+          setTool('room');
+        } else if (e.key === 'd' || e.key === 'D') {
+          setTool('door');
+        } else if (e.key === 'o' || e.key === 'O') {
+          setTool('window');
+        } else if (e.key === 'm' || e.key === 'M') {
+          setTool('measure');
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, handleDeleteSelected, plan]);
+  }, [handleUndo, handleRedo, handleDeleteSelected, plan, viewMode]);
 
   return (
     <div

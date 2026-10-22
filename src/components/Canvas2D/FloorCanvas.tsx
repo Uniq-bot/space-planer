@@ -110,7 +110,6 @@ export const FloorCanvas: React.FC<FloorCanvasProps> = ({
    
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    console.log(ctx)
     if (!ctx) return;
 
     const vs = currentViewRef.current;
@@ -1077,8 +1076,16 @@ export const FloorCanvas: React.FC<FloorCanvasProps> = ({
 
       // 5. Check click on rooms
       for (const room of plan.rooms) {
-        const rw = room.area ? Math.sqrt(room.area) * 100 : 380;
-        const rh = room.area ? Math.sqrt(room.area) * 100 : 340;
+        let rw = 380;
+        let rh = 340;
+        if (room.width && room.height) {
+          rw = Math.max(20, room.width - 15);
+          rh = Math.max(20, room.height - 15);
+        } else if (room.area) {
+          const side = Math.sqrt(room.area) * 100;
+          rw = Math.max(20, side - 15);
+          rh = Math.max(20, side - 15);
+        }
         const inFloor = Math.abs(world.x - room.x) <= rw / 2 && Math.abs(world.y - room.y) <= rh / 2;
         const inBadge = Math.hypot(world.x - room.x, world.y - room.y) < 40;
 
@@ -1434,8 +1441,16 @@ export const FloorCanvas: React.FC<FloorCanvasProps> = ({
       }
 
       for (const room of plan.rooms) {
-        const rw = room.area ? Math.sqrt(room.area) * 100 : 380;
-        const rh = room.area ? Math.sqrt(room.area) * 100 : 340;
+        let rw = 380;
+        let rh = 340;
+        if (room.width && room.height) {
+          rw = Math.max(20, room.width - 15);
+          rh = Math.max(20, room.height - 15);
+        } else if (room.area) {
+          const side = Math.sqrt(room.area) * 100;
+          rw = Math.max(20, side - 15);
+          rh = Math.max(20, side - 15);
+        }
         const inFloor = Math.abs(world.x - room.x) <= rw / 2 && Math.abs(world.y - room.y) <= rh / 2;
         const inBadge = Math.hypot(world.x - room.x, world.y - room.y) < 36;
         if (inFloor || inBadge) {

@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FloorPlan, Wall, Opening, SymbolItem } from '../../types/floorplan';
 import { ThemeColors } from '../../constants/themes';
-import { getThreeTexture } from '../../utils/textures';
+import { createPBRMaterial } from '../../utils/textures';
+import { getArchitecturalEnvironment, disposeEnvironment } from '../../utils/pbrEnvironment';
 import { buildFurniture3D } from './furniture3D';
 import {
   preloadModelTypes,
@@ -11,23 +12,72 @@ import {
   disposeHierarchy
 } from './modelLoader';
 
+export const DEFAULT_LOOK_SENSITIVITY = 0.0022;
+
 interface Walkthrough3DProps {
   plan: FloorPlan;
   theme: ThemeColors;
   selectedIds: string[];
   onSelectIds: (ids: string[], isToggle?: boolean) => void;
+  mouseSensitivity?: number;
 }
 
 export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
   plan,
   theme,
   selectedIds,
-  onSelectIds
+  onSelectIds,
+  mouseSensitivity = DEFAULT_LOOK_SENSITIVITY
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [cameraMode, setCameraMode] = useState<'orbit' | 'firstPerson'>('orbit');
   const [seeThroughWalls, setSeeThroughWalls] = useState<boolean>(false);
   const [modelVersion, setModelVersion] = useState(0);
+  const [isPointerLocked, setIsPointerLocked] = useState<boolean>(false);
+
+  // Persistent Three.js Core Refs (created once, preserved across updates)
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const planGroupRef = useRef<THREE.Group | null>(null);
+  const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const selectableMeshesRef = useRef<THREE.Mesh[]>([]);
+
+  // Synchronous State Refs to prevent stale callbacks and unwanted effect triggers
+  const cameraModeRef = useRef<'orbit' | 'firstPerson'>(cameraMode);
+  const selectedIdsRef = useRef<string[]>(selectedIds);
+  const onSelectIdsRef = useRef(onSelectIds);
+  const isPointerLockedRef = useRef<boolean>(false);
+  const sensitivityRef = useRef<number>(mouseSensitivity);
+
+  useEffect(() => {
+    onSelectIdsRef.current = onSelectIds;
+  }, [onSelectIds]);
+
+  useEffect(() => {
+    selectedIdsRef.current = selectedIds;
+  }, [selectedIds]);
+
+  useEffect(() => {
+    cameraModeRef.current = cameraMode;
+  }, [cameraMode]);
+
+  useEffect(() => {
+    sensitivityRef.current = mouseSensitivity;
+  }, [mouseSensitivity]);
+
+  // First-person state with stable yaw, pitch, and direct responsive key tracking
+  const fpState = useRef({
+    pos: new THREE.Vector3(260, 160, 260),
+    pitch: 0,
+    yaw: 0,
+    keys: { forward: false, backward: false, left: false, right: false, shift: false }
+  });
+
+  const clickStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initialPlanRef = useRef(plan);
+  const initialThemeRef = useRef(theme);
 
   // Preload 3D models for furniture present in the floor plan
   useEffect(() => {
@@ -35,41 +85,25 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     preloadModelTypes(types);
   }, [plan.symbols]);
 
-  // Subscribe to background model loads to update the scene smoothly
+  // Subscribe to background model loads to update furniture meshes smoothly without camera resets
   useEffect(() => {
     return addModelLoadListener(() => {
       setModelVersion((v) => v + 1);
     });
   }, []);
 
-  // References
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const selectableMeshesRef = useRef<THREE.Mesh[]>([]);
-
-  // First-person state with velocity damping
-  const fpState = useRef({
-    pos: new THREE.Vector3(260, 160, 260),
-    vel: new THREE.Vector3(),
-    pitch: 0,
-    yaw: 0,
-    keys: { forward: false, backward: false, left: false, right: false },
-    isDraggingLook: false,
-    prevMouse: { x: 0, y: 0 }
-  });
-
-  const clickStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
+  // 1. Core Scene, Renderer, Camera, and Controls Initialization (Runs ONCE on mount)
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    selectableMeshesRef.current = [];
+    const initPlan = initialPlanRef.current;
+    const initTheme = initialThemeRef.current;
 
-    // 1. Scene setup
+    // 1. Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(theme.name === 'dark' ? 0x0f172a : 0xf4f2ec);
+    sceneRef.current = scene;
+    scene.background = new THREE.Color(initTheme.name === 'dark' ? 0x0f172a : 0xf4f2ec);
 
     // 2. Camera setup
     const rect = container.getBoundingClientRect();
@@ -78,15 +112,28 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     const aspect = w / h;
     const camera = new THREE.PerspectiveCamera(50, aspect, 1, 8000);
     cameraRef.current = camera;
-    camera.position.set(450, 600, 750);
 
-    // 3. Renderer with Cinematic Tone Mapping
+    // Compute floor plan bounding box to set initial camera framing
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    initPlan.walls.forEach((wall) => {
+      minX = Math.min(minX, wall.x1, wall.x2);
+      maxX = Math.max(maxX, wall.x1, wall.x2);
+      minY = Math.min(minY, wall.y1, wall.y2);
+      maxY = Math.max(maxY, wall.y1, wall.y2);
+    });
+    const centerX = isFinite(minX) ? (minX + maxX) / 2 : 300;
+    const centerY = isFinite(minY) ? (minY + maxY) / 2 : 300;
+    const initialSpan = Math.max(maxX - minX, maxY - minY, 600);
+
+    camera.position.set(centerX + initialSpan * 0.6, Math.max(500, initialSpan * 0.75), centerY + initialSpan * 0.85);
+
+    // 3. Renderer with Cinematic ACESFilmic Tone Mapping and sRGB color space
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     rendererRef.current = renderer;
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.10;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -94,70 +141,343 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // 4. Smooth OrbitControls
+    // 4. Smooth OrbitControls with damping, zooming, panning, and rotation enabled
     const controls = new OrbitControls(camera, renderer.domElement);
     controlsRef.current = controls;
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = true;
+    controls.enableRotate = true;
+    controls.enableZoom = true;
+    controls.enablePan = true;
     controls.maxPolarAngle = Math.PI / 2.05;
-    controls.minDistance = 60;
-    controls.maxDistance = 2800;
-    controls.target.set(300, 60, 300);
+    controls.minDistance = 20;
+    controls.maxDistance = 6000;
+    controls.target.set(centerX, 40, centerY);
+    controls.enabled = cameraModeRef.current === 'orbit';
     controls.update();
 
-    // 5. Rich Multi-Source Lighting
-    const ambientLight = new THREE.AmbientLight(0xfff7ee, 0.62);
+    // 5. High-Fidelity PMREM Environment Lighting for Realistic PBR Reflections
+    const envTexture = getArchitecturalEnvironment(renderer);
+    scene.environment = envTexture;
+    scene.environmentIntensity = 0.90;
+
+    // 6. Balanced Multi-Source Architectural Lighting
+    const ambientLight = new THREE.AmbientLight(0xfff7ee, 0.55);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.45);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.40);
     hemiLight.position.set(0, 1500, 0);
     scene.add(hemiLight);
 
-    // Primary warm sunlight with soft architectural shadows
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.15);
-    sunLight.position.set(900, 1500, 700);
+    // Primary warm sunlight with soft contact shadows
+    const shadowRadius = initialSpan * 0.75 + 150;
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.25);
+    sunLightRef.current = sunLight;
+    sunLight.position.set(centerX + 650, 1400, centerY + 550);
+    sunLight.target.position.set(centerX, 0, centerY);
+    scene.add(sunLight.target);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 100;
-    sunLight.shadow.camera.far = 4500;
-    sunLight.shadow.camera.left = -1600;
-    sunLight.shadow.camera.right = 1600;
-    sunLight.shadow.camera.top = 1600;
-    sunLight.shadow.camera.bottom = -1600;
-    sunLight.shadow.bias = -0.0003;
-    sunLight.shadow.normalBias = 0.02;
+    sunLight.shadow.camera.far = 4000;
+    sunLight.shadow.camera.left = -shadowRadius;
+    sunLight.shadow.camera.right = shadowRadius;
+    sunLight.shadow.camera.top = shadowRadius;
+    sunLight.shadow.camera.bottom = -shadowRadius;
+    sunLight.shadow.bias = -0.0001;
+    sunLight.shadow.normalBias = 0.025;
     scene.add(sunLight);
 
-    // Secondary sky fill light from opposite angle to reveal material details
-    const fillLight = new THREE.DirectionalLight(0xbfdbfe, 0.42);
-    fillLight.position.set(-800, 1100, -600);
+    // Secondary soft sky fill light from opposite angle to reveal details
+    const fillLight = new THREE.DirectionalLight(0xbfdbfe, 0.40);
+    fillLight.position.set(centerX - 600, 1100, centerY - 500);
     scene.add(fillLight);
 
-    // 6. Ground grid plane
-    const gridHelper = new THREE.GridHelper(3600, 72, 0x94a3b8, 0xd8d6cf);
+    // 7. Ground grid plane
+    const gridHelper = new THREE.GridHelper(4000, 80, 0x94a3b8, 0xd8d6cf);
     gridHelper.position.y = -0.5;
     scene.add(gridHelper);
 
-    // 7. Base Materials
+    // 8. Container Group for all plan geometry (walls, floors, furniture)
+    const planGroup = new THREE.Group();
+    planGroupRef.current = planGroup;
+    scene.add(planGroup);
+
+    // 9. Continuous Animation Loop (Synchronized & direct response, zero input lag)
+    let animId: number;
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+
+      if (cameraModeRef.current === 'orbit') {
+        controls.update();
+      } else {
+        const fp = fpState.current;
+        // Direction vectors strictly parallel to ground (no unexpected vertical drift)
+        const fwdX = -Math.sin(fp.yaw);
+        const fwdZ = -Math.cos(fp.yaw);
+        const rgtX = Math.cos(fp.yaw);
+        const rgtZ = -Math.sin(fp.yaw);
+
+        let moveX = 0;
+        let moveZ = 0;
+
+        if (fp.keys.forward) { moveX += fwdX; moveZ += fwdZ; }
+        if (fp.keys.backward) { moveX -= fwdX; moveZ -= fwdZ; }
+        if (fp.keys.left) { moveX -= rgtX; moveZ -= rgtZ; }
+        if (fp.keys.right) { moveX += rgtX; moveZ += rgtZ; }
+
+        const moveLen = Math.hypot(moveX, moveZ);
+        if (moveLen > 0.0001) {
+          const speed = fp.keys.shift ? 7.0 : 4.0; // cm per frame
+          fp.pos.x += (moveX / moveLen) * speed;
+          fp.pos.z += (moveZ / moveLen) * speed;
+        }
+
+        // Camera position remains locked to eye height
+        camera.position.copy(fp.pos);
+
+        // Direction strictly clamped to prevent camera flipping
+        const cosP = Math.cos(fp.pitch);
+        const sinP = Math.sin(fp.pitch);
+        const lookX = -Math.sin(fp.yaw) * cosP;
+        const lookY = sinP;
+        const lookZ = -Math.cos(fp.yaw) * cosP;
+
+        camera.lookAt(fp.pos.x + lookX, fp.pos.y + lookY, fp.pos.z + lookZ);
+      }
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // 10. Responsive ResizeObserver
+    const handleResize = () => {
+      if (!container || !renderer || !camera) return;
+      const rect = container.getBoundingClientRect();
+      const newW = Math.round(rect.width);
+      const newH = Math.round(rect.height);
+      if (newW > 0 && newH > 0) {
+        camera.aspect = newW / newH;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newW, newH);
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(() => handleResize());
+    resizeObserver.observe(container);
+    window.addEventListener('resize', handleResize);
+
+    // 11. Pointer Lock, Mouse & Keyboard Event Handlers
+    const raycaster = new THREE.Raycaster();
+    const dom = renderer.domElement;
+
+    const handlePointerLockChange = () => {
+      const locked = document.pointerLockElement === dom;
+      setIsPointerLocked(locked);
+      isPointerLockedRef.current = locked;
+      if (!locked) {
+        // Reset keys on lock release (Escape or blur)
+        const k = fpState.current.keys;
+        k.forward = false;
+        k.backward = false;
+        k.left = false;
+        k.right = false;
+        k.shift = false;
+      }
+    };
+
+    const handlePointerLockError = () => {
+      setIsPointerLocked(false);
+      isPointerLockedRef.current = false;
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      clickStartRef.current = { x: e.clientX, y: e.clientY };
+
+      if (cameraModeRef.current === 'firstPerson' && e.button === 0) {
+        if (!isPointerLockedRef.current) {
+          try {
+            const res = dom.requestPointerLock() as any;
+            if (res && typeof res.catch === 'function') {
+              res.catch(() => {});
+            }
+          } catch {
+            // Pointer lock not permitted in this context
+          }
+        }
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (cameraModeRef.current === 'firstPerson') {
+        if (isPointerLockedRef.current) {
+          const sens = sensitivityRef.current;
+          const mx = e.movementX ?? (e as any).mozMovementX ?? (e as any).webkitMovementX ?? 0;
+          const my = e.movementY ?? (e as any).mozMovementY ?? (e as any).webkitMovementY ?? 0;
+
+          // Stable yaw & pitch deltas
+          fpState.current.yaw -= mx * sens;
+          const maxPitch = Math.PI * 0.48; // ~86.4 degrees to prevent flipping/gimbal lock
+          fpState.current.pitch = Math.max(-maxPitch, Math.min(maxPitch, fpState.current.pitch - my * sens));
+        }
+      } else if (cameraModeRef.current === 'orbit') {
+        const rect = dom.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+          const hits = raycaster.intersectObjects(selectableMeshesRef.current, false);
+          dom.style.cursor = hits.length > 0 ? 'pointer' : 'default';
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      const dist = Math.hypot(e.clientX - clickStartRef.current.x, e.clientY - clickStartRef.current.y);
+      if (dist < 6 && cameraModeRef.current === 'orbit') {
+        const rect = dom.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+        const intersects = raycaster.intersectObjects(selectableMeshesRef.current, false);
+        const isShiftOrCtrl = e.shiftKey || e.ctrlKey || e.metaKey;
+
+        if (intersects.length > 0) {
+          const hitMesh = intersects[0].object as THREE.Mesh;
+          let curr: THREE.Object3D | null = hitMesh;
+          let foundId: string | null = null;
+          while (curr && curr !== scene) {
+            if (curr.userData && curr.userData.id) {
+              foundId = curr.userData.id;
+              break;
+            }
+            curr = curr.parent;
+          }
+          if (foundId) {
+            onSelectIdsRef.current([foundId], isShiftOrCtrl);
+            return;
+          }
+        } else if (!isShiftOrCtrl) {
+          onSelectIdsRef.current([]);
+        }
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (cameraModeRef.current === 'firstPerson') {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+          fpState.current.keys.forward = true;
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+          fpState.current.keys.backward = true;
+        } else if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+          fpState.current.keys.left = true;
+        } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+          fpState.current.keys.right = true;
+        } else if (e.key === 'Shift') {
+          fpState.current.keys.shift = true;
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (cameraModeRef.current === 'firstPerson') {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+          fpState.current.keys.forward = false;
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+          fpState.current.keys.backward = false;
+        } else if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+          fpState.current.keys.left = false;
+        } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+          fpState.current.keys.right = false;
+        } else if (e.key === 'Shift') {
+          fpState.current.keys.shift = false;
+        }
+      }
+    };
+
+    const handleBlur = () => {
+      const k = fpState.current.keys;
+      k.forward = false;
+      k.backward = false;
+      k.left = false;
+      k.right = false;
+      k.shift = false;
+    };
+
+    dom.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    document.addEventListener('pointerlockerror', handlePointerLockError);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      dom.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+      document.removeEventListener('pointerlockerror', handlePointerLockError);
+
+      if (document.pointerLockElement === dom) {
+        try {
+          document.exitPointerLock();
+        } catch {}
+      }
+
+      controls.dispose();
+      disposeHierarchy(scene);
+      renderer.dispose();
+      disposeEnvironment();
+      controlsRef.current = null;
+      cameraRef.current = null;
+      rendererRef.current = null;
+      sceneRef.current = null;
+      planGroupRef.current = null;
+    };
+  }, []); // Run ONCE on mount
+
+  // 2. Rebuild Plan Content in planGroup without recreating Renderer, Camera, or OrbitControls
+  useEffect(() => {
+    const planGroup = planGroupRef.current;
+    if (!planGroup) return;
+
+    // Dispose existing transient geometries & materials in planGroup (preserves GLTF templates)
+    disposeHierarchy(planGroup);
+    planGroup.clear();
+    selectableMeshesRef.current = [];
+
+    // Base materials with physical reflectance
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0x93c5fd,
       transparent: true,
-      opacity: 0.42,
-      roughness: 0.05,
-      metalness: 0.95
+      opacity: 0.38,
+      roughness: 0.04,
+      metalness: 0.05,
+      envMapIntensity: 1.2
     });
 
     const woodFurnitureMat = new THREE.MeshStandardMaterial({
       color: 0x8b5a2b,
-      roughness: 0.55,
-      metalness: 0.08
+      roughness: 0.50,
+      metalness: 0.02,
+      envMapIntensity: 1.0
     });
 
-    // 8. Build Walls & Openings in 3D (Selectable!)
+    // Build Walls & Openings in 3D with Proportional Texture Scaling
     plan.walls.forEach((wall: Wall) => {
-      const isSel = selectedIds.includes(wall.id);
+      const isSel = selectedIdsRef.current.includes(wall.id);
       const p1 = new THREE.Vector2(wall.x1, wall.y1);
       const p2 = new THREE.Vector2(wall.x2, wall.y2);
       const dir = new THREE.Vector2().subVectors(p2, p1);
@@ -168,20 +488,15 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
       const wallHeight = wall.height || 270;
       const thickness = wall.thickness || 15;
 
-      const wallTex = getThreeTexture('wall', wall.material || 'clean_white');
-      const wallMat = new THREE.MeshStandardMaterial({
-        map: wallTex,
-        roughness: 0.82,
-        metalness: 0.05,
-        transparent: seeThroughWalls,
-        opacity: seeThroughWalls ? 0.35 : 1.0,
-        emissive: isSel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000),
-        emissiveIntensity: isSel ? 0.28 : 0
-      });
-
       const wallOpenings = plan.openings.filter((o: Opening) => o.wall_id === wall.id);
 
       if (wallOpenings.length === 0) {
+        const wallMat = createPBRMaterial('wall', wall.material || 'clean_white', wallLen, wallHeight, {
+          transparent: seeThroughWalls,
+          opacity: seeThroughWalls ? 0.35 : 1.0,
+          isSelected: isSel
+        });
+
         const geom = new THREE.BoxGeometry(wallLen, wallHeight, thickness);
         const mesh = new THREE.Mesh(geom, wallMat);
         mesh.castShadow = !seeThroughWalls;
@@ -191,10 +506,10 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         const mid = new THREE.Vector2().addVectors(p1, p2).multiplyScalar(0.5);
         mesh.position.set(mid.x, wallHeight / 2, mid.y);
         mesh.rotation.y = -angle;
-        scene.add(mesh);
+        planGroup.add(mesh);
         selectableMeshesRef.current.push(mesh);
       } else {
-        const wallGroup = new THREE.Group();
+        const wallSubGroup = new THREE.Group();
         const sortedOps = [...wallOpenings].sort((a, b) => a.position - b.position);
         let currOffset = 0;
 
@@ -206,34 +521,51 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
 
           if (opStart > currOffset) {
             const segLen = opStart - currOffset;
+            const segMat = createPBRMaterial('wall', wall.material || 'clean_white', segLen, wallHeight, {
+              transparent: seeThroughWalls,
+              opacity: seeThroughWalls ? 0.35 : 1.0,
+              isSelected: isSel
+            });
             const segGeom = new THREE.BoxGeometry(segLen, wallHeight, thickness);
-            const segMesh = new THREE.Mesh(segGeom, wallMat);
+            const segMesh = new THREE.Mesh(segGeom, segMat);
             segMesh.castShadow = !seeThroughWalls;
             segMesh.receiveShadow = true;
             segMesh.userData = { id: wall.id, type: 'wall' };
             segMesh.position.set(currOffset + segLen / 2, wallHeight / 2, 0);
-            wallGroup.add(segMesh);
+            wallSubGroup.add(segMesh);
             selectableMeshesRef.current.push(segMesh);
           }
 
           const opH = op.height || 210;
           const lintelH = Math.max(0, wallHeight - (op.sill_height || 0) - opH);
           if (lintelH > 0) {
-            const lintelGeom = new THREE.BoxGeometry(opEnd - opStart, lintelH, thickness);
-            const lintelMesh = new THREE.Mesh(lintelGeom, wallMat);
+            const lintelW = opEnd - opStart;
+            const lintelMat = createPBRMaterial('wall', wall.material || 'clean_white', lintelW, lintelH, {
+              transparent: seeThroughWalls,
+              opacity: seeThroughWalls ? 0.35 : 1.0,
+              isSelected: isSel
+            });
+            const lintelGeom = new THREE.BoxGeometry(lintelW, lintelH, thickness);
+            const lintelMesh = new THREE.Mesh(lintelGeom, lintelMat);
             lintelMesh.userData = { id: wall.id, type: 'wall' };
             lintelMesh.position.set((opStart + opEnd) / 2, wallHeight - lintelH / 2, 0);
-            wallGroup.add(lintelMesh);
+            wallSubGroup.add(lintelMesh);
             selectableMeshesRef.current.push(lintelMesh);
           }
 
           if (op.type === 'window' && (op.sill_height || 0) > 0) {
             const sillH = op.sill_height || 90;
-            const sillGeom = new THREE.BoxGeometry(opEnd - opStart, sillH, thickness);
-            const sillMesh = new THREE.Mesh(sillGeom, wallMat);
+            const sillW = opEnd - opStart;
+            const sillMat = createPBRMaterial('wall', wall.material || 'clean_white', sillW, sillH, {
+              transparent: seeThroughWalls,
+              opacity: seeThroughWalls ? 0.35 : 1.0,
+              isSelected: isSel
+            });
+            const sillGeom = new THREE.BoxGeometry(sillW, sillH, thickness);
+            const sillMesh = new THREE.Mesh(sillGeom, sillMat);
             sillMesh.userData = { id: wall.id, type: 'wall' };
             sillMesh.position.set((opStart + opEnd) / 2, sillH / 2, 0);
-            wallGroup.add(sillMesh);
+            wallSubGroup.add(sillMesh);
             selectableMeshesRef.current.push(sillMesh);
           }
 
@@ -243,15 +575,15 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
             doorMesh.userData = { id: op.id, type: 'opening' };
             doorMesh.position.set((opStart + opEnd) / 2, opH / 2, 0);
             doorMesh.castShadow = true;
-            wallGroup.add(doorMesh);
+            wallSubGroup.add(doorMesh);
             selectableMeshesRef.current.push(doorMesh);
           } else {
             const glassGeom = new THREE.BoxGeometry(opEnd - opStart - 2, opH - 2, 2);
-            const glassMesh = new THREE.Mesh(glassGeom, glassMat);
-            glassMesh.userData = { id: op.id, type: 'opening' };
-            glassMesh.position.set((opStart + opEnd) / 2, (op.sill_height || 0) + opH / 2, 0);
-            wallGroup.add(glassMesh);
-            selectableMeshesRef.current.push(glassMesh);
+            const windowGlassMesh = new THREE.Mesh(glassGeom, glassMat);
+            windowGlassMesh.userData = { id: op.id, type: 'opening' };
+            windowGlassMesh.position.set((opStart + opEnd) / 2, (op.sill_height || 0) + opH / 2, 0);
+            wallSubGroup.add(windowGlassMesh);
+            selectableMeshesRef.current.push(windowGlassMesh);
           }
 
           currOffset = opEnd;
@@ -259,23 +591,28 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
 
         if (currOffset < wallLen) {
           const segLen = wallLen - currOffset;
+          const segMat = createPBRMaterial('wall', wall.material || 'clean_white', segLen, wallHeight, {
+            transparent: seeThroughWalls,
+            opacity: seeThroughWalls ? 0.35 : 1.0,
+            isSelected: isSel
+          });
           const segGeom = new THREE.BoxGeometry(segLen, wallHeight, thickness);
-          const segMesh = new THREE.Mesh(segGeom, wallMat);
+          const segMesh = new THREE.Mesh(segGeom, segMat);
           segMesh.castShadow = !seeThroughWalls;
           segMesh.receiveShadow = true;
           segMesh.userData = { id: wall.id, type: 'wall' };
           segMesh.position.set(currOffset + segLen / 2, wallHeight / 2, 0);
-          wallGroup.add(segMesh);
+          wallSubGroup.add(segMesh);
           selectableMeshesRef.current.push(segMesh);
         }
 
-        wallGroup.position.set(p1.x, 0, p1.y);
-        wallGroup.rotation.y = -angle;
-        scene.add(wallGroup);
+        wallSubGroup.position.set(p1.x, 0, p1.y);
+        wallSubGroup.rotation.y = -angle;
+        planGroup.add(wallSubGroup);
       }
     });
 
-    // 8b. Precision 3D Corner & Bend Junction Pillars (Seals all corner gaps, rectangles, and wall bends!)
+    // Corner & Bend Junction Pillars (Seals corner seams with matched wall finish)
     const junctionClusters: {
       x: number;
       y: number;
@@ -313,40 +650,26 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
     junctionClusters
       .filter((jc) => jc.wallIds.length >= 2)
       .forEach((jc) => {
-        const isAnySel = jc.wallIds.some((wid) => selectedIds.includes(wid));
-        const jcTex = getThreeTexture('wall', (jc.material as any) || 'clean_white');
-        const jcMat = new THREE.MeshStandardMaterial({
-          map: jcTex,
-          roughness: 0.82,
-          metalness: 0.05,
+        const isAnySel = jc.wallIds.some((wid) => selectedIdsRef.current.includes(wid));
+        const pillarMat = createPBRMaterial('wall', (jc.material as any) || 'clean_white', jc.maxThickness, jc.maxHeight, {
           transparent: seeThroughWalls,
           opacity: seeThroughWalls ? 0.35 : 1.0,
-          emissive: isAnySel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000),
-          emissiveIntensity: isAnySel ? 0.28 : 0
+          isSelected: isAnySel
         });
 
         const pillarGeom = new THREE.BoxGeometry(jc.maxThickness, jc.maxHeight, jc.maxThickness);
-        const pillarMesh = new THREE.Mesh(pillarGeom, jcMat);
+        const pillarMesh = new THREE.Mesh(pillarGeom, pillarMat);
         pillarMesh.position.set(jc.x, jc.maxHeight / 2, jc.y);
         pillarMesh.castShadow = !seeThroughWalls;
         pillarMesh.receiveShadow = true;
         pillarMesh.userData = { id: jc.wallIds[0], type: 'wall' };
-        scene.add(pillarMesh);
+        planGroup.add(pillarMesh);
         selectableMeshesRef.current.push(pillarMesh);
       });
 
-    // 9. Build Room Floor Slabs (Selectable!)
+    // Build Room Floor Slabs with Physical PBR and Non-Distorting UVs
     plan.rooms.forEach((room) => {
-      const isSel = selectedIds.includes(room.id);
-      const floorTex = getThreeTexture('floor', room.floorMaterial || 'oak_wood');
-      const floorMat = new THREE.MeshStandardMaterial({
-        map: floorTex,
-        roughness: 0.45,
-        metalness: 0.05,
-        emissive: isSel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000),
-        emissiveIntensity: isSel ? 0.25 : 0
-      });
-
+      const isSel = selectedIdsRef.current.includes(room.id);
       let floorW = 420;
       let floorH = 380;
       if (room.width && room.height) {
@@ -358,185 +681,134 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         floorH = Math.max(20, side - 15);
       }
 
+      const floorMat = createPBRMaterial('floor', room.floorMaterial || 'oak_wood', floorW, floorH, {
+        isSelected: isSel
+      });
+
       const floorGeom = new THREE.BoxGeometry(floorW, 2, floorH);
       const floorMesh = new THREE.Mesh(floorGeom, floorMat);
       floorMesh.position.set(room.x, 1, room.y);
       floorMesh.receiveShadow = true;
       floorMesh.userData = { id: room.id, type: 'room' };
-      scene.add(floorMesh);
+      planGroup.add(floorMesh);
       selectableMeshesRef.current.push(floorMesh);
     });
 
-    // 10. Build High-Fidelity 3D Furniture (Selectable & Raycastable)
+    // Build High-Fidelity 3D Furniture (Selectable & Raycastable)
     plan.symbols.forEach((sym: SymbolItem) => {
-      const isSel = selectedIds.includes(sym.id);
+      const isSel = selectedIdsRef.current.includes(sym.id);
       const { group: symGroup, selectables } = buildFurniture3D(sym, isSel);
       symGroup.position.set(sym.x, 0, sym.y);
       symGroup.rotation.y = -((sym.rotation || 0) * Math.PI) / 180;
-      scene.add(symGroup);
+      planGroup.add(symGroup);
       selectables.forEach((m) => selectableMeshesRef.current.push(m));
 
       // Dynamic warm accent point lights for luminaire symbols
       if (sym.type === 'ceiling_light') {
         const pLight = new THREE.PointLight(0xfffaed, 0.9, 450, 1.3);
         pLight.position.set(sym.x, 215, sym.y);
-        scene.add(pLight);
+        planGroup.add(pLight);
       } else if (sym.type === 'nightstand') {
         const pLight = new THREE.PointLight(0xffedd5, 0.55, 220, 1.5);
         pLight.position.set(sym.x, 65, sym.y);
-        scene.add(pLight);
+        planGroup.add(pLight);
       }
     });
 
-    // 11. Animation Loop
-    let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-
-      if (cameraMode === 'orbit') {
-        controls.update();
-      } else {
-        const fp = fpState.current;
-        const forward = new THREE.Vector3(-Math.sin(fp.yaw), 0, -Math.cos(fp.yaw));
-        const right = new THREE.Vector3(Math.cos(fp.yaw), 0, -Math.sin(fp.yaw));
-
-        const targetVel = new THREE.Vector3();
-        const walkSpeed = 5;
-
-        if (fp.keys.forward) targetVel.add(forward.clone().multiplyScalar(walkSpeed));
-        if (fp.keys.backward) targetVel.add(forward.clone().multiplyScalar(-walkSpeed));
-        if (fp.keys.left) targetVel.add(right.clone().multiplyScalar(-walkSpeed));
-        if (fp.keys.right) targetVel.add(right.clone().multiplyScalar(walkSpeed));
-
-        fp.vel.lerp(targetVel, 0.2);
-        fp.pos.add(fp.vel);
-
-        camera.position.copy(fp.pos);
-        const lookDir = new THREE.Vector3(
-          -Math.sin(fp.yaw) * Math.cos(fp.pitch),
-          Math.sin(fp.pitch),
-          -Math.cos(fp.yaw) * Math.cos(fp.pitch)
-        );
-        camera.lookAt(fp.pos.clone().add(lookDir));
+    // Update sunlight target position dynamically to match plan bounds
+    if (sunLightRef.current && sceneRef.current) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      plan.walls.forEach((wall) => {
+        minX = Math.min(minX, wall.x1, wall.x2);
+        maxX = Math.max(maxX, wall.x1, wall.x2);
+        minY = Math.min(minY, wall.y1, wall.y2);
+        maxY = Math.max(maxY, wall.y1, wall.y2);
+      });
+      if (isFinite(minX)) {
+        const cX = (minX + maxX) / 2;
+        const cY = (minY + maxY) / 2;
+        sunLightRef.current.position.set(cX + 650, 1400, cY + 550);
+        sunLightRef.current.target.position.set(cX, 0, cY);
       }
+    }
+  }, [plan, seeThroughWalls, modelVersion]); // Camera and controls are completely preserved!
 
-      renderer.render(scene, camera);
-    };
+  // 3. Selection Highlight In-Place without rebuilding scene or resetting camera
+  useEffect(() => {
+    selectedIdsRef.current = selectedIds;
+    selectableMeshesRef.current.forEach((mesh) => {
+      const id = mesh.userData?.id;
+      if (!id) return;
+      const isSel = selectedIds.includes(id);
+      const selColor = isSel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000);
+      const selIntensity = isSel ? 0.38 : 0;
 
-    animate();
-
-    // 12. ResizeObserver
-    const handleResize = () => {
-      if (!container || !renderer || !camera) return;
-      const rect = container.getBoundingClientRect();
-      const newW = Math.round(rect.width);
-      const newH = Math.round(rect.height);
-      if (newW > 0 && newH > 0) {
-        camera.aspect = newW / newH;
-        camera.updateProjectionMatrix();
-        renderer.setSize(newW, newH);
-      }
-    };
-
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
-    });
-    resizeObserver.observe(container);
-    window.addEventListener('resize', handleResize);
-
-    // 13. Raycaster for Multi-Select in 3D
-    const raycaster = new THREE.Raycaster();
-    const dom = renderer.domElement;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      clickStartRef.current = { x: e.clientX, y: e.clientY };
-
-      if (cameraMode === 'firstPerson' && e.button === 0) {
-        fpState.current.isDraggingLook = true;
-        fpState.current.prevMouse = { x: e.clientX, y: e.clientY };
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (cameraMode === 'firstPerson' && fpState.current.isDraggingLook) {
-        const dx = e.clientX - fpState.current.prevMouse.x;
-        const dy = e.clientY - fpState.current.prevMouse.y;
-        fpState.current.yaw -= dx * 0.004;
-        fpState.current.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, fpState.current.pitch - dy * 0.004));
-        fpState.current.prevMouse = { x: e.clientX, y: e.clientY };
-      } else if (cameraMode === 'orbit') {
-        const rect = dom.getBoundingClientRect();
-        const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
-        const hits = raycaster.intersectObjects(selectableMeshesRef.current, false);
-        dom.style.cursor = hits.length > 0 ? 'pointer' : 'default';
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      fpState.current.isDraggingLook = false;
-
-      const dist = Math.hypot(e.clientX - clickStartRef.current.x, e.clientY - clickStartRef.current.y);
-      if (dist < 6 && cameraMode === 'orbit') {
-        const rect = dom.getBoundingClientRect();
-        const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-        raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
-        const intersects = raycaster.intersectObjects(selectableMeshesRef.current, false);
-        const isShiftOrCtrl = e.shiftKey || e.ctrlKey || e.metaKey;
-
-        if (intersects.length > 0) {
-          const hitMesh = intersects[0].object as THREE.Mesh;
-          if (hitMesh.userData && hitMesh.userData.id) {
-            onSelectIds([hitMesh.userData.id], isShiftOrCtrl);
-            return;
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach((m) => {
+          if ('emissive' in m) {
+            (m as THREE.MeshStandardMaterial).emissive.copy(selColor);
+            (m as THREE.MeshStandardMaterial).emissiveIntensity = selIntensity;
           }
-        } else if (!isShiftOrCtrl) {
-          onSelectIds([]);
-        }
+        });
+      } else if (mesh.material && 'emissive' in mesh.material) {
+        (mesh.material as THREE.MeshStandardMaterial).emissive.copy(selColor);
+        (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = selIntensity;
       }
-    };
+    });
+  }, [selectedIds]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (cameraMode === 'firstPerson') {
-        if (e.key === 'w' || e.key === 'ArrowUp') fpState.current.keys.forward = true;
-        if (e.key === 's' || e.key === 'ArrowDown') fpState.current.keys.backward = true;
-        if (e.key === 'a' || e.key === 'ArrowLeft') fpState.current.keys.left = true;
-        if (e.key === 'd' || e.key === 'ArrowRight') fpState.current.keys.right = true;
+  // 4. Update Scene Background Color In-Place when Theme Changes
+  useEffect(() => {
+    if (sceneRef.current) {
+      sceneRef.current.background = new THREE.Color(theme.name === 'dark' ? 0x0f172a : 0xf4f2ec);
+    }
+  }, [theme]);
+
+  // 5. Camera Mode Toggle without jumping or camera snapping
+  useEffect(() => {
+    cameraModeRef.current = cameraMode;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+
+    if (cameraMode === 'orbit') {
+      // Exit pointer lock if active (pointerlockchange event will update state)
+      if (document.pointerLockElement) {
+        try {
+          document.exitPointerLock();
+        } catch {}
       }
-    };
+      isPointerLockedRef.current = false;
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (cameraMode === 'firstPerson') {
-        if (e.key === 'w' || e.key === 'ArrowUp') fpState.current.keys.forward = false;
-        if (e.key === 's' || e.key === 'ArrowDown') fpState.current.keys.backward = false;
-        if (e.key === 'a' || e.key === 'ArrowLeft') fpState.current.keys.left = false;
-        if (e.key === 'd' || e.key === 'ArrowRight') fpState.current.keys.right = false;
+      controls.enabled = true;
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      controls.target.copy(camera.position).addScaledVector(dir, 350);
+      controls.update();
+    } else {
+      controls.enabled = false;
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      fpState.current.yaw = Math.atan2(-dir.x, -dir.z);
+      fpState.current.pitch = Math.asin(Math.max(-0.99, Math.min(0.99, dir.y)));
+
+      // If user was viewing from high aerial camera, place at natural eye height
+      if (camera.position.y > 280) {
+        fpState.current.pos.set(camera.position.x, 160, camera.position.z);
+        camera.position.copy(fpState.current.pos);
+      } else {
+        fpState.current.pos.copy(camera.position);
       }
-    };
 
-    dom.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
-      dom.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      controls.dispose();
-      disposeHierarchy(scene);
-      renderer.dispose();
-    };
-  }, [plan, theme, selectedIds, cameraMode, seeThroughWalls, onSelectIds, modelVersion]);
+      // Reset movement keys
+      const k = fpState.current.keys;
+      k.forward = false;
+      k.backward = false;
+      k.left = false;
+      k.right = false;
+      k.shift = false;
+    }
+  }, [cameraMode]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -565,9 +837,6 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
           onClick={() => {
             const nextMode = cameraMode === 'orbit' ? 'firstPerson' : 'orbit';
             setCameraMode(nextMode);
-            if (controlsRef.current) {
-              controlsRef.current.enabled = nextMode === 'orbit';
-            }
           }}
           style={{
             background: cameraMode === 'orbit' ? '#2563eb' : '#334155',
@@ -600,25 +869,87 @@ export const Walkthrough3D: React.FC<Walkthrough3DProps> = ({
         </button>
       </div>
 
+      {/* First-Person Mode HUD & Prompt */}
       {cameraMode === 'firstPerson' && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(6px)',
-            padding: '8px 18px',
-            borderRadius: 20,
-            color: '#ffffff',
-            fontSize: 12,
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            pointerEvents: 'none'
-          }}
-        >
-          Move: <b>W A S D</b> or <b>Arrow Keys</b> | Look: <b>Drag Mouse</b>
-        </div>
+        <>
+          {/* Interactive Entry Banner when not pointer locked */}
+          {!isPointerLocked ? (
+            <div
+              onClick={() => {
+                const dom = rendererRef.current?.domElement;
+                if (dom) {
+                  try {
+                    const res = dom.requestPointerLock() as any;
+                    if (res && typeof res.catch === 'function') res.catch(() => {});
+                  } catch {}
+                }
+              }}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: 'rgba(15, 23, 42, 0.90)',
+                backdropFilter: 'blur(10px)',
+                padding: '16px 28px',
+                borderRadius: 12,
+                color: '#ffffff',
+                textAlign: 'center',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                cursor: 'pointer',
+                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+                userSelect: 'none',
+                zIndex: 20
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
+                🖱️ Click to Enter Mouse Look
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                Move: <b>W A S D</b> (Shift to sprint) • Look: <b>Mouse</b> • Exit: <b>Esc</b>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Subtle Central Reticle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: 4,
+                  height: 4,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  boxShadow: '0 0 4px rgba(0, 0, 0, 0.6)',
+                  transform: 'translate(-50%, -50%)',
+                  pointerEvents: 'none',
+                  zIndex: 15
+                }}
+              />
+              {/* Bottom active pill */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 24,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(6px)',
+                  padding: '8px 18px',
+                  borderRadius: 20,
+                  color: '#ffffff',
+                  fontSize: 12,
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  pointerEvents: 'none',
+                  zIndex: 15
+                }}
+              >
+                Mouse Look Active • Press <b>Esc</b> to release cursor • Move: <b>W A S D</b>
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );

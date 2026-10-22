@@ -134,8 +134,16 @@ export function computeMiteredWalls(walls: Wall[], snapDist = 10): Map<string, M
       const cross = u1.x * u2.y - u1.y * u2.x;
       if (Math.abs(cross) < 0.05) {
         // Nearly collinear / straight continuation: join cleanly
-        c1.isStart ? (m1.startIsMitered = true) : (m1.endIsMitered = true);
-        c2.isStart ? (m2.startIsMitered = true) : (m2.endIsMitered = true);
+        if (c1.isStart) {
+          m1.startIsMitered = true;
+        } else {
+          m1.endIsMitered = true;
+        }
+        if (c2.isStart) {
+          m2.startIsMitered = true;
+        } else {
+          m2.endIsMitered = true;
+        }
         return;
       }
 
@@ -211,7 +219,11 @@ export function computeMiteredWalls(walls: Wall[], snapDist = 10): Map<string, M
       j.connections.forEach((c) => {
         const m = result.get(c.wallId);
         if (!m) return;
-        c.isStart ? (m.startIsMitered = true) : (m.endIsMitered = true);
+        if (c.isStart) {
+          m.startIsMitered = true;
+        } else {
+          m.endIsMitered = true;
+        }
       });
     }
   });

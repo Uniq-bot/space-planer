@@ -58,6 +58,11 @@ export const MODEL_PATH_MAP: Record<string, string> = {
 // Cache of loaded model templates keyed by type
 const modelCache = new Map<string, CachedModelTemplate>();
 
+// Registry of template geometries, materials, and textures to protect them from being disposed by transient scene cleanups
+const templateGeometries = new WeakSet<THREE.BufferGeometry>();
+const templateMaterials = new WeakSet<THREE.Material>();
+const templateTextures = new WeakSet<THREE.Texture>();
+
 // Pending load promises to prevent duplicate downloads
 const loadingPromises = new Map<string, Promise<CachedModelTemplate | null>>();
 
@@ -127,6 +132,33 @@ export async function loadModel(type: string): Promise<CachedModelTemplate | nul
 
       // Ensure matrix world is updated for bounding box computation
       scene.updateMatrixWorld(true);
+
+      // Register template geometries and materials so transient scene disposals do not destroy cached assets
+      scene.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          if (mesh.geometry) {
+            templateGeometries.add(mesh.geometry);
+          }
+          if (mesh.material) {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach((m) => {
+              templateMaterials.add(m);
+              if ('envMapIntensity' in m) {
+                (m as THREE.MeshStandardMaterial).envMapIntensity = 1.0;
+              }
+              if ('map' in m && (m as any).map) {
+                const tex = (m as any).map as THREE.Texture;
+                tex.colorSpace = THREE.SRGBColorSpace;
+                templateTextures.add(tex);
+              }
+              if ('normalMap' in m && (m as any).normalMap) templateTextures.add((m as any).normalMap);
+              if ('roughnessMap' in m && (m as any).roughnessMap) templateTextures.add((m as any).roughnessMap);
+              if ('metalnessMap' in m && (m as any).metalnessMap) templateTextures.add((m as any).metalnessMap);
+            });
+          }
+        }
+      });
 
       const box = new THREE.Box3().setFromObject(scene);
       const size = new THREE.Vector3();
@@ -228,25 +260,23 @@ export function instantiateFurnitureModel(
       mesh.userData = { id: symId, type: 'symbol' };
       selectables.push(mesh);
 
-      // Handle selection highlight without destroying original materials or textures
-      if (isSel) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map((m) => {
-            const clonedMat = m.clone();
-            if ('emissive' in clonedMat) {
-              (clonedMat as THREE.MeshStandardMaterial).emissive = new THREE.Color(0x2563eb);
-              (clonedMat as THREE.MeshStandardMaterial).emissiveIntensity = 0.38;
-            }
-            return clonedMat;
-          });
-        } else if (mesh.material) {
-          const clonedMat = mesh.material.clone();
+      // Clone materials per-instance so selection emissive highlighting never mutates template or other instances
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((m) => {
+          const clonedMat = m.clone();
           if ('emissive' in clonedMat) {
-            (clonedMat as THREE.MeshStandardMaterial).emissive = new THREE.Color(0x2563eb);
-            (clonedMat as THREE.MeshStandardMaterial).emissiveIntensity = 0.38;
+            (clonedMat as THREE.MeshStandardMaterial).emissive = isSel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000);
+            (clonedMat as THREE.MeshStandardMaterial).emissiveIntensity = isSel ? 0.38 : 0;
           }
-          mesh.material = clonedMat;
+          return clonedMat;
+        });
+      } else if (mesh.material) {
+        const clonedMat = mesh.material.clone();
+        if ('emissive' in clonedMat) {
+          (clonedMat as THREE.MeshStandardMaterial).emissive = isSel ? new THREE.Color(0x2563eb) : new THREE.Color(0x000000);
+          (clonedMat as THREE.MeshStandardMaterial).emissiveIntensity = isSel ? 0.38 : 0;
         }
+        mesh.material = clonedMat;
       }
     }
   });
@@ -255,19 +285,27 @@ export function instantiateFurnitureModel(
 }
 
 /**
- * Recursively disposes geometries and materials in an object tree to avoid memory leaks.
+ * Recursively disposes transient geometries and materials in an object tree,
+ * while safely preserving shared model template geometries, materials, and textures in modelCache.
  */
 export function disposeHierarchy(obj: THREE.Object3D) {
   obj.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
       const mesh = child as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.geometry && !templateGeometries.has(mesh.geometry)) {
+        mesh.geometry.dispose();
+      }
       if (mesh.material) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((m) => m.dispose());
-        } else {
-          mesh.material.dispose();
-        }
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((m) => {
+          if (!templateMaterials.has(m)) {
+            const std = m as THREE.MeshStandardMaterial;
+            if (std.map && !templateTextures.has(std.map)) {
+              std.map.dispose();
+            }
+            m.dispose();
+          }
+        });
       }
     }
   });

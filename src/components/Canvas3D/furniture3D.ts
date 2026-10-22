@@ -75,7 +75,8 @@ const createFurnitureMaterials = (isSel: boolean) => {
       transparent: true,
       opacity: 0.35,
       roughness: 0.05,
-      metalness: 0.9,
+      metalness: 0.05,
+      envMapIntensity: 1.2,
       emissive: selEmissive,
       emissiveIntensity: selIntensity
     }),
